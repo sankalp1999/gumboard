@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
 import { NOTE_COLORS } from "@/lib/constants"
+import { computeNoteContentHash } from "@/lib/utils"
 
 // Get all notes from all boards in the organization
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -101,6 +102,7 @@ export async function POST(request: NextRequest) {
         color: randomColor,
         boardId,
         createdBy: session.user.id,
+        contentHash: computeNoteContentHash({ content, isChecklist: false, checklistItems: [] })
       },
       include: {
         user: {

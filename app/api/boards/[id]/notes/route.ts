@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
 import { NOTE_COLORS } from "@/lib/constants"
+import { computeNoteContentHash, normalizeNoteContent } from "@/lib/utils"
 
 // Get all notes for a board
 export async function GET(
@@ -105,6 +106,7 @@ export async function POST(
         color: randomColor,
         boardId,
         createdBy: session.user.id,
+        contentHash: computeNoteContentHash({ content, isChecklist: false, checklistItems: [] })
       },
       include: {
         user: {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
+import { computeNoteContentHash, normalizeNoteContent, deepEqualChecklistItems } from "@/lib/utils"
 
 // Update a note
 export async function PUT(
@@ -50,6 +51,29 @@ export async function PUT(
       return NextResponse.json({ error: "Only the note author or admin can edit this note" }, { status: 403 })
     }
 
+    // Compute current and next hashes to avoid no-op writes/notifications
+    const nextNormalized = normalizeNoteContent({
+      content: content !== undefined ? content : note.content,
+      isChecklist: isChecklist !== undefined ? isChecklist : note.isChecklist,
+      checklistItems: checklistItems !== undefined ? checklistItems : (note.checklistItems as any)
+    })
+    const nextHash = computeNoteContentHash(nextNormalized)
+
+    // If nothing changes, return existing note
+    const currentHash = note.contentHash || computeNoteContentHash({
+      content: note.content,
+      isChecklist: note.isChecklist,
+      checklistItems: (note.checklistItems as any) || []
+    })
+
+    const contentChanged = nextHash !== currentHash
+    const colorChanged = color !== undefined && color !== note.color
+    const doneChanged = done !== undefined && done !== note.done
+
+    if (!contentChanged && !colorChanged && !doneChanged) {
+      return NextResponse.json({ note })
+    }
+
     const updatedNote = await db.note.update({
       where: { id: noteId },
       data: {
@@ -58,6 +82,7 @@ export async function PUT(
         ...(done !== undefined && { done }),
         ...(isChecklist !== undefined && { isChecklist }),
         ...(checklistItems !== undefined && { checklistItems }),
+        ...(contentChanged && { contentHash: nextHash })
       },
       include: {
         user: {
