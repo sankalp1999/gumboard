@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
-import { updateSlackMessage, formatNoteForSlack, sendSlackMessage, sendTodoNotification, hasValidContent, shouldSendNotification } from "@/lib/slack"
+import { updateSlackMessage, formatNoteForSlack, sendSlackMessage, hasValidContent, shouldSendNotification, sendChecklistSummaryMessage } from "@/lib/slack"
+import { diffChecklistItems } from "@/lib/checklist"
 
 interface ChecklistItem {
   id: string
@@ -126,36 +127,34 @@ export async function PUT(
       }
     })
 
-    // Send individual todo notifications if checklist items have changed
+    // Send a single batched Slack summary if checklist items changed
     if (checklistItems !== undefined && user.organization?.slackWebhookUrl) {
       const oldItems = (note.checklistItems as unknown as ChecklistItem[]) || []
       const newItems = (checklistItems as unknown as ChecklistItem[]) || []
-      const { addedItems, completedItems } = detectChecklistChanges(oldItems, newItems)
-      
+      const changes = diffChecklistItems(oldItems, newItems)
+
       const userName = user.name || user.email || 'Unknown User'
       const boardName = updatedNote.board.name
-      
-      // Send notifications for newly added todos
-      for (const addedItem of addedItems) {
-        if (hasValidContent(addedItem.content) && shouldSendNotification(session.user.id, boardId, boardName, note.board.sendSlackUpdates)) {
-          await sendTodoNotification(
-            user.organization.slackWebhookUrl,
-            addedItem.content,
-            boardName,
-            userName,
-            'added'
-          )
-        }
+
+      const summary = {
+        added: changes.added.map(i => i.content).filter(hasValidContent),
+        completed: changes.completed.map(i => i.content).filter(Boolean),
+        reopened: changes.reopened.map(i => i.content).filter(Boolean),
+        edited: changes.edited
+          .filter(e => hasValidContent(e.before.content) || hasValidContent(e.after.content))
+          .map(e => ({ before: e.before.content, after: e.after.content })),
+        deleted: changes.deleted.map(i => i.content).filter(Boolean),
       }
-      
-      // Send notifications for newly completed todos
-      for (const completedItem of completedItems) {
-        await sendTodoNotification(
+
+      const hasAnySummary =
+        summary.added.length || summary.completed.length || summary.reopened.length || summary.edited.length || summary.deleted.length
+
+      if (hasAnySummary && shouldSendNotification(session.user.id, boardId, boardName, note.board.sendSlackUpdates)) {
+        await sendChecklistSummaryMessage(
           user.organization.slackWebhookUrl,
-          completedItem.content,
           boardName,
           userName,
-          'completed'
+          summary
         )
       }
     }
