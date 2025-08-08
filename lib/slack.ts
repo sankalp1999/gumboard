@@ -80,6 +80,7 @@ export async function sendSlackMessage(webhookUrl: string, message: SlackMessage
 
 export async function updateSlackMessage(webhookUrl: string, originalText: string, completed: boolean, boardName: string, userName: string): Promise<void> {
   try {
+    // Incoming webhooks cannot update existing messages; we post a new summary-style message instead.
     const updatedText = completed 
       ? `:white_check_mark: ${originalText} by ${userName} in ${boardName}`
       : `:heavy_plus_sign: ${originalText} by ${userName} in ${boardName}`
@@ -115,6 +116,74 @@ export async function sendTodoNotification(webhookUrl: string, todoContent: stri
   const message = formatTodoForSlack(todoContent, boardName, userName, action)
   return await sendSlackMessage(webhookUrl, {
     text: message,
+    username: 'Gumboard',
+    icon_emoji: ':clipboard:'
+  })
+}
+
+export function formatChecklistSummary(
+  boardName: string,
+  userName: string,
+  summary: {
+    added: string[]
+    completed: string[]
+    reopened: string[]
+    edited: Array<{ before: string; after: string }>
+    deleted: string[]
+  }
+): string {
+  const lines: string[] = []
+  const bullets: string[] = []
+
+  if (summary.added.length) {
+    for (const t of summary.added) bullets.push(`:heavy_plus_sign: ${t}`)
+  }
+  if (summary.completed.length) {
+    for (const t of summary.completed) bullets.push(`:white_check_mark: ${t}`)
+  }
+  if (summary.reopened.length) {
+    for (const t of summary.reopened) bullets.push(`:arrow_backward: ${t}`)
+  }
+  if (summary.edited.length) {
+    for (const e of summary.edited) bullets.push(`:pencil2: ${e.before} → ${e.after}`)
+  }
+  if (summary.deleted.length) {
+    for (const t of summary.deleted) bullets.push(`:wastebasket: ${t}`)
+  }
+
+  if (bullets.length === 0) {
+    return ''
+  }
+
+  const maxItems = 6
+  const displayed = bullets.slice(0, maxItems)
+  const remaining = bullets.length - displayed.length
+
+  lines.push(`Checklist updates by ${userName} in ${boardName}`)
+  lines.push(...displayed.map(b => `• ${b}`))
+  if (remaining > 0) {
+    lines.push(`…and ${remaining} more`)
+  }
+
+  return lines.join('\n')
+}
+
+export async function sendChecklistSummaryMessage(
+  webhookUrl: string,
+  boardName: string,
+  userName: string,
+  summary: {
+    added: string[]
+    completed: string[]
+    reopened: string[]
+    edited: Array<{ before: string; after: string }>
+    deleted: string[]
+  }
+): Promise<string | null> {
+  const text = formatChecklistSummary(boardName, userName, summary)
+  if (!text) return null
+  return await sendSlackMessage(webhookUrl, {
+    text,
     username: 'Gumboard',
     icon_emoji: ':clipboard:'
   })
