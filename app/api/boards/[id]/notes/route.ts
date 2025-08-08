@@ -135,7 +135,7 @@ export async function POST(
         })
       }
 
-      return await tx.note.findUnique({
+      const finalNote = await tx.note.findUnique({
         where: { id: created.id },
         include: {
           user: {
@@ -148,23 +148,32 @@ export async function POST(
           checklistItems: { orderBy: { order: 'asc' } }
         }
       })
-    })
 
-    if (user.organization?.slackWebhookUrl && hasValidContent(content) && shouldSendNotification(session.user.id, boardId, board.name, board.sendSlackUpdates)) {
-      const slackMessage = formatNoteForSlack(note, board.name, user.name || user.email)
-      const messageId = await sendSlackMessage(user.organization.slackWebhookUrl, {
-        text: slackMessage,
-        username: 'Gumboard',
-        icon_emoji: ':clipboard:'
-      })
+      // Handle Slack notification within the transaction
+      if (user.organization?.slackWebhookUrl && hasValidContent(content) && shouldSendNotification(session.user.id, boardId, board.name, board.sendSlackUpdates)) {
+        try {
+          const slackMessage = formatNoteForSlack(finalNote, board.name, user.name || user.email)
+          const messageId = await sendSlackMessage(user.organization.slackWebhookUrl, {
+            text: slackMessage,
+            username: 'Gumboard',
+            icon_emoji: ':clipboard:'
+          })
 
-      if (messageId) {
-        await db.note.update({
-          where: { id: note.id },
-          data: { slackMessageId: messageId }
-        })
+          if (messageId) {
+            await tx.note.update({
+              where: { id: created.id },
+              data: { slackMessageId: messageId }
+            })
+          }
+        } catch (slackError) {
+          // Log Slack errors but don't fail the transaction
+          console.error('Slack notification failed:', slackError)
+          // Continue without failing - the note creation is more important than Slack notifications
+        }
       }
-    }
+
+      return finalNote
+    })
 
     return NextResponse.json({ note }, { status: 201 })
   } catch (error) {

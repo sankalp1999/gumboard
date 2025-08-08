@@ -126,53 +126,60 @@ export async function PUT(
         createdItems = toCreate
         updatedItems = toUpdate.map((i) => ({ id: i.id, content: i.content, checked: i.checked, order: i.order, previous: { content: existingMap.get(i.id)!.content, checked: existingMap.get(i.id)!.checked, order: existingMap.get(i.id)!.order, slackMessageId: existingMap.get(i.id)!.slackMessageId } }))
         deletedItems = toDelete.map((i) => ({ id: i.id, content: i.content, checked: i.checked, order: i.order }))
-
-        // Refresh note with updated items
-        return await tx.note.findUnique({
-          where: { id: noteId },
-          include: { board: true, user: { select: { id: true, name: true, email: true } }, checklistItems: { orderBy: { order: 'asc' } } },
-        })
       }
 
-      return n
-    })
-
-    // Slack notifications centralized
-    if (user.organization?.slackWebhookUrl) {
-      const res = await notifySlackForNoteChanges({
-        webhookUrl: user.organization.slackWebhookUrl,
-        boardName: updatedNote!.board.name,
-        boardId,
-        sendSlackUpdates: updatedNote!.board.sendSlackUpdates,
-        userId: session.user.id,
-        userName: user.name || user.email || 'Unknown User',
-        prevContent,
-        nextContent: content ?? prevContent,
-        noteSlackMessageId: note.slackMessageId,
-        itemChanges: Array.isArray(checklistItems)
-          ? { created: createdItems, updated: updatedItems, deleted: deletedItems }
-          : undefined,
+      // Get the final note with all relations
+      const finalNote = await tx.note.findUnique({
+        where: { id: noteId },
+        include: { board: true, user: { select: { id: true, name: true, email: true } }, checklistItems: { orderBy: { order: 'asc' } } },
       })
 
-      if (res.noteMessageId && !note.slackMessageId) {
-        await db.note.update({ where: { id: noteId }, data: { slackMessageId: res.noteMessageId } })
-      }
-      if (res.itemMessageIds) {
-        for (const [itemId, msgId] of Object.entries(res.itemMessageIds)) {
-          await db.checklistItem.update({ where: { id: itemId }, data: { slackMessageId: msgId } })
+      // Handle Slack notifications within the transaction
+      if (user.organization?.slackWebhookUrl) {
+        try {
+          const res = await notifySlackForNoteChanges({
+            webhookUrl: user.organization.slackWebhookUrl,
+            boardName: finalNote!.board.name,
+            boardId,
+            sendSlackUpdates: finalNote!.board.sendSlackUpdates,
+            userId: session.user.id,
+            userName: user.name || user.email || 'Unknown User',
+            prevContent,
+            nextContent: content ?? prevContent,
+            noteSlackMessageId: note.slackMessageId,
+            itemChanges: Array.isArray(checklistItems)
+              ? { created: createdItems, updated: updatedItems, deleted: deletedItems }
+              : undefined,
+          })
+
+          // Update Slack message IDs within the transaction
+          if (res.noteMessageId && !note.slackMessageId) {
+            await tx.note.update({ where: { id: noteId }, data: { slackMessageId: res.noteMessageId } })
+          }
+          if (res.itemMessageIds) {
+            for (const [itemId, msgId] of Object.entries(res.itemMessageIds)) {
+              await tx.checklistItem.update({ where: { id: itemId }, data: { slackMessageId: msgId } })
+            }
+          }
+
+          // Note done toggle message (optional)
+          if (typeof done === 'boolean') {
+            const contentForDone = hasValidContent(finalNote!.content)
+              ? finalNote!.content
+              : finalNote!.checklistItems[0]?.content || 'Note'
+            if (hasValidContent(contentForDone)) {
+              await updateSlackMessage(user.organization.slackWebhookUrl, contentForDone, done, finalNote!.board.name, user.name || user.email || 'Unknown User')
+            }
+          }
+        } catch (slackError) {
+          // Log Slack errors but don't fail the transaction
+          console.error('Slack notification failed:', slackError)
+          // Continue without failing - the note update is more important than Slack notifications
         }
       }
 
-      // Note done toggle message (optional)
-      if (typeof done === 'boolean') {
-        const contentForDone = hasValidContent(updatedNote!.content)
-          ? updatedNote!.content
-          : updatedNote!.checklistItems[0]?.content || 'Note'
-        if (hasValidContent(contentForDone)) {
-          await updateSlackMessage(user.organization.slackWebhookUrl, contentForDone, done, updatedNote!.board.name, user.name || user.email || 'Unknown User')
-        }
-      }
-    }
+      return finalNote
+    })
 
     return NextResponse.json({ note: updatedNote })
   } catch (error) {
