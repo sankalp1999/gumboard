@@ -108,26 +108,6 @@ export async function PUT(
 
         const existing = await tx.checklistItem.findMany({ where: { noteId }, orderBy: { order: 'asc' } })
         const existingMap = new Map(existing.map((i) => [i.id, i]))
-
-        // Stabilize IDs: if an incoming item ID doesn't match any existing item,
-        // but content+order matches an existing item that otherwise would be treated as deleted,
-        // treat it as the same item (ID drift on the client) instead of a create.
-        const consumedExistingIds = new Set<string>()
-        const existingBySignature = new Map<string, typeof existing[number]>
-          (existing.map((i) => [`${i.content}::${i.order}`, i]))
-
-        for (const item of sanitizedItems) {
-          if (!existingMap.has(item.id)) {
-            const sig = `${item.content}::${item.order}`
-            const candidate = existingBySignature.get(sig)
-            if (candidate && !consumedExistingIds.has(candidate.id)) {
-              // Remap incoming item to use the existing persistent ID
-              item.id = candidate.id
-              consumedExistingIds.add(candidate.id)
-            }
-          }
-        }
-
         const incomingMap = new Map(sanitizedItems.map((i) => [i.id, i]))
 
         const toCreate = sanitizedItems.filter((i) => !existingMap.has(i.id))
@@ -192,7 +172,11 @@ export async function PUT(
           }
 
           // Note done toggle message only when the done status actually changes
-          if (typeof done === 'boolean' && done !== prevDone) {
+          // AND the change was caused by an explicit checkbox toggle (not just create/delete/reorder)
+          const hasCheckedToggle = Array.isArray(checklistItems)
+            ? updatedItems.some((u) => !!u.previous && u.previous.checked !== u.checked)
+            : false
+          if (typeof done === 'boolean' && done !== prevDone && hasCheckedToggle) {
             const contentForDone = hasValidContent(finalNote!.content)
               ? finalNote!.content
               : finalNote!.checklistItems[0]?.content || 'Note'
