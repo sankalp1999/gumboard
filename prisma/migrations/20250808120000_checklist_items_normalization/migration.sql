@@ -47,3 +47,6 @@ END$$;
 -- Drop old JSON column
 ALTER TABLE "notes" DROP COLUMN IF EXISTS "checklistItems";
 
+-- Add index for noteId to improve query performance
+CREATE INDEX idx_checklist_items_noteId ON "checklist_items"("noteId");
+
