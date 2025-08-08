@@ -753,12 +753,9 @@ export default function BoardPage({
 
       const updatedItems = [...(currentNote.checklistItems || []), newItem];
 
-      const allItemsChecked = updatedItems.every((item) => item.checked);
-
       const optimisticNote = {
         ...currentNote,
         checklistItems: updatedItems,
-        done: allItemsChecked,
       };
 
       setNotes(notes.map((n) => (n.id === noteId ? optimisticNote : n)));
@@ -771,7 +768,7 @@ export default function BoardPage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            checklistItems: updatedItems,
+            checklistItems: sanitizeChecklistItems(updatedItems),
           }),
         }
       );
