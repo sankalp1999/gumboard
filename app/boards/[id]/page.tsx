@@ -37,7 +37,22 @@ interface ChecklistItem {
   content: string;
   checked: boolean;
   order: number;
+  // Database fields that should not be sent to the backend
+  slackMessageId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  noteId?: string;
 }
+
+// Helper to sanitize checklist items before sending to backend
+const sanitizeChecklistItems = (items: ChecklistItem[]): ChecklistItem[] => {
+  return items.map(item => ({
+    id: item.id,
+    content: item.content,
+    checked: item.checked,
+    order: item.order
+  }));
+};
 
 interface Note {
   id: string;
@@ -1009,7 +1024,9 @@ export default function BoardPage({
           : boardId;
 
       const newItem: ChecklistItem = {
-        id: `item-${Date.now()}`,
+        id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+          ? crypto.randomUUID()
+          : `item-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         content: newChecklistItemContent,
         checked: false,
         order: (currentNote.checklistItems || []).length,
@@ -1038,7 +1055,7 @@ export default function BoardPage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            checklistItems: updatedItems,
+            checklistItems: sanitizeChecklistItems(updatedItems),
             done: allItemsChecked,
           }),
         }
@@ -1108,7 +1125,7 @@ export default function BoardPage({
       // OPTIMISTIC UPDATE
       const optimisticNote = {
         ...currentNote,
-        checklistItems: sortedItems,
+        checklistItems: sanitizeChecklistItems(sortedItems),
         done: allItemsChecked,
       };
 
@@ -1131,7 +1148,7 @@ export default function BoardPage({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          checklistItems: sortedItems,
+          checklistItems: sanitizeChecklistItems(sortedItems),
           done: allItemsChecked,
         }),
       })
@@ -1207,7 +1224,7 @@ export default function BoardPage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            checklistItems: updatedItems,
+            checklistItems: sanitizeChecklistItems(updatedItems),
             done: allItemsChecked,
           }),
         }
@@ -1272,7 +1289,7 @@ export default function BoardPage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            checklistItems: updatedItems,
+            checklistItems: sanitizeChecklistItems(updatedItems),
             done: allItemsChecked,
           }),
         }
@@ -1355,7 +1372,7 @@ export default function BoardPage({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            checklistItems: sortedItems,
+            checklistItems: sanitizeChecklistItems(sortedItems),
             done: noteIsDone,
           }),
         }
@@ -1401,7 +1418,9 @@ export default function BoardPage({
 
       // Create new item with second half
       const newItem = {
-        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+          ? crypto.randomUUID()
+          : `item_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
         content: secondHalf,
         checked: false,
         order: currentOrder + 0.5,
@@ -1418,7 +1437,7 @@ export default function BoardPage({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            checklistItems: allItems,
+            checklistItems: sanitizeChecklistItems(allItems),
           }),
         }
       );

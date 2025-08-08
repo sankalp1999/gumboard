@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
-import { notifySlackForNoteChanges, hasValidContent, updateSlackMessage } from "@/lib/slack"
+import { notifySlackForNoteChanges, hasValidContent, updateSlackMessage, shouldSendNotification } from "@/lib/slack"
 
 type IncomingChecklistItem = { id: string; content: string; checked: boolean; order: number }
 
@@ -73,7 +73,8 @@ export async function PUT(
 
     // Snapshot previous state for Slack
     const prevContent = note.content
-    const prevItems = note.checklistItems || []
+    const prevDone = note.done
+    const sessionUserId = session.user!.id
 
     let createdItems: IncomingChecklistItem[] = []
     let updatedItems: { id: string; content: string; checked: boolean; order: number; previous: { content: string; checked: boolean; order: number; slackMessageId?: string | null } }[] = []
@@ -81,7 +82,7 @@ export async function PUT(
 
     const updatedNote = await db.$transaction(async (tx) => {
       // Update note fields
-      const n = await tx.note.update({
+      await tx.note.update({
         where: { id: noteId },
         data: {
           ...(content !== undefined && { content }),
@@ -97,12 +98,40 @@ export async function PUT(
 
       // Reconcile checklist items if provided
       if (Array.isArray(checklistItems)) {
+        // Sanitize incoming items - only keep allowed fields, remove database fields
+        const sanitizedItems: IncomingChecklistItem[] = (checklistItems as IncomingChecklistItem[]).map(item => ({
+          id: item.id,
+          content: item.content,
+          checked: item.checked,
+          order: item.order
+        }))
+
         const existing = await tx.checklistItem.findMany({ where: { noteId }, orderBy: { order: 'asc' } })
         const existingMap = new Map(existing.map((i) => [i.id, i]))
-        const incomingMap = new Map((checklistItems as IncomingChecklistItem[]).map((i) => [i.id, i]))
 
-        const toCreate = (checklistItems as IncomingChecklistItem[]).filter((i) => !existingMap.has(i.id))
-        const toUpdate = (checklistItems as IncomingChecklistItem[]).filter((i) => {
+        // Stabilize IDs: if an incoming item ID doesn't match any existing item,
+        // but content+order matches an existing item that otherwise would be treated as deleted,
+        // treat it as the same item (ID drift on the client) instead of a create.
+        const consumedExistingIds = new Set<string>()
+        const existingBySignature = new Map<string, typeof existing[number]>
+          (existing.map((i) => [`${i.content}::${i.order}`, i]))
+
+        for (const item of sanitizedItems) {
+          if (!existingMap.has(item.id)) {
+            const sig = `${item.content}::${item.order}`
+            const candidate = existingBySignature.get(sig)
+            if (candidate && !consumedExistingIds.has(candidate.id)) {
+              // Remap incoming item to use the existing persistent ID
+              item.id = candidate.id
+              consumedExistingIds.add(candidate.id)
+            }
+          }
+        }
+
+        const incomingMap = new Map(sanitizedItems.map((i) => [i.id, i]))
+
+        const toCreate = sanitizedItems.filter((i) => !existingMap.has(i.id))
+        const toUpdate = sanitizedItems.filter((i) => {
           const old = existingMap.get(i.id)
           return !!old && (old.content !== i.content || old.checked !== i.checked || old.order !== i.order)
         })
@@ -142,7 +171,7 @@ export async function PUT(
             boardName: finalNote!.board.name,
             boardId,
             sendSlackUpdates: finalNote!.board.sendSlackUpdates,
-            userId: session.user.id,
+            userId: sessionUserId,
             userName: user.name || user.email || 'Unknown User',
             prevContent,
             nextContent: content ?? prevContent,
@@ -162,13 +191,22 @@ export async function PUT(
             }
           }
 
-          // Note done toggle message (optional)
-          if (typeof done === 'boolean') {
+          // Note done toggle message only when the done status actually changes
+          if (typeof done === 'boolean' && done !== prevDone) {
             const contentForDone = hasValidContent(finalNote!.content)
               ? finalNote!.content
               : finalNote!.checklistItems[0]?.content || 'Note'
-            if (hasValidContent(contentForDone)) {
-              await updateSlackMessage(user.organization.slackWebhookUrl, contentForDone, done, finalNote!.board.name, user.name || user.email || 'Unknown User')
+            if (
+              hasValidContent(contentForDone) &&
+              shouldSendNotification(sessionUserId, boardId, finalNote!.board.name, finalNote!.board.sendSlackUpdates)
+            ) {
+              await updateSlackMessage(
+                user.organization.slackWebhookUrl,
+                contentForDone,
+                done,
+                finalNote!.board.name,
+                user.name || user.email || 'Unknown User'
+              )
             }
           }
         } catch (slackError) {
