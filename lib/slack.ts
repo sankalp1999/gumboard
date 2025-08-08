@@ -119,3 +119,95 @@ export async function sendTodoNotification(webhookUrl: string, todoContent: stri
     icon_emoji: ':clipboard:'
   })
 }
+
+// Centralized notifier that dedupes posts and handles per-item updates
+export type ChecklistItemDiff = {
+  id: string
+  content: string
+  checked: boolean
+  order: number
+  previous?: {
+    content: string
+    checked: boolean
+    order: number
+    slackMessageId?: string | null
+  }
+  slackMessageId?: string | null
+}
+
+export async function notifySlackForNoteChanges(params: {
+  webhookUrl?: string | null
+  boardName: string
+  boardId: string
+  sendSlackUpdates: boolean
+  userId: string
+  userName: string
+  prevContent?: string | null
+  nextContent?: string | null
+  noteSlackMessageId?: string | null
+  itemChanges?: {
+    created: ChecklistItemDiff[]
+    updated: ChecklistItemDiff[]
+    deleted: ChecklistItemDiff[]
+  }
+}): Promise<{ noteMessageId?: string | null; itemMessageIds?: Record<string, string> }> {
+  const {
+    webhookUrl,
+    boardName,
+    boardId,
+    sendSlackUpdates,
+    userId,
+    userName,
+    prevContent,
+    nextContent,
+    noteSlackMessageId,
+    itemChanges
+  } = params
+
+  const result: { noteMessageId?: string | null; itemMessageIds?: Record<string, string> } = {}
+
+  if (!webhookUrl || !sendSlackUpdates) return result
+
+  // Note content messages
+  const hadContent = hasValidContent(prevContent)
+  const hasContentNow = hasValidContent(nextContent)
+
+  // Only send new message on empty -> non-empty
+  if (!noteSlackMessageId && !hadContent && hasContentNow && shouldSendNotification(userId, boardId, boardName, sendSlackUpdates)) {
+    const msg = formatNoteForSlack({ content: nextContent as string }, boardName, userName)
+    result.noteMessageId = await sendSlackMessage(webhookUrl, { text: msg, username: 'Gumboard', icon_emoji: ':clipboard:' })
+  }
+
+  // Checklist items
+  const itemMessageIds: Record<string, string> = {}
+
+  if (itemChanges) {
+    // Created -> "added"
+    for (const c of itemChanges.created) {
+      if (!hasValidContent(c.content)) continue
+      if (!shouldSendNotification(userId, boardId, boardName, sendSlackUpdates)) continue
+      const id = await sendTodoNotification(webhookUrl, c.content, boardName, userName, 'added')
+      if (id) itemMessageIds[c.id] = id
+    }
+
+    // Updated -> notify only on checked toggle
+    for (const u of itemChanges.updated) {
+      if (!u.previous) continue
+      if (u.previous.checked !== u.checked) {
+        if (!hasValidContent(u.content)) continue
+        if (!shouldSendNotification(userId, boardId, boardName, sendSlackUpdates)) continue
+        const action = u.checked ? 'completed' : 'added' // treat uncheck as informational "added"
+        const id = await sendTodoNotification(webhookUrl, u.content, boardName, userName, action)
+        if (id) itemMessageIds[u.id] = id
+      }
+    }
+
+    // Deleted -> optional: no-op to avoid noise
+  }
+
+  if (Object.keys(itemMessageIds).length > 0) {
+    result.itemMessageIds = itemMessageIds
+  }
+
+  return result
+}

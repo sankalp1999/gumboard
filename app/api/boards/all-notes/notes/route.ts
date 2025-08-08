@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true
           }
-        }
+        },
+        checklistItems: { orderBy: { order: 'asc' } }
       },
       orderBy: {
         createdAt: 'desc'

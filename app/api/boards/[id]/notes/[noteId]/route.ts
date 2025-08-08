@@ -1,40 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
-import { updateSlackMessage, formatNoteForSlack, sendSlackMessage, sendTodoNotification, hasValidContent, shouldSendNotification } from "@/lib/slack"
+import { notifySlackForNoteChanges, hasValidContent, updateSlackMessage } from "@/lib/slack"
 
-interface ChecklistItem {
-  id: string
-  content: string
-  checked: boolean
-  order: number
-}
-
-// Helper function to detect checklist item changes
-function detectChecklistChanges(oldItems: ChecklistItem[] = [], newItems: ChecklistItem[] = []) {
-  const addedItems: ChecklistItem[] = []
-  const completedItems: ChecklistItem[] = []
-  
-  // Create map for efficient lookup
-  const oldItemsMap = new Map(oldItems.map(item => [item.id, item]))
-  
-  // Find newly added items
-  for (const newItem of newItems) {
-    if (!oldItemsMap.has(newItem.id)) {
-      addedItems.push(newItem)
-    }
-  }
-  
-  // Find newly completed items
-  for (const newItem of newItems) {
-    const oldItem = oldItemsMap.get(newItem.id)
-    if (oldItem && !oldItem.checked && newItem.checked) {
-      completedItems.push(newItem)
-    }
-  }
-  
-  return { addedItems, completedItems }
-}
+type IncomingChecklistItem = { id: string; content: string; checked: boolean; order: number }
 
 // Update a note
 export async function PUT(
@@ -79,7 +48,8 @@ export async function PUT(
             name: true,
             email: true
           }
-        }
+        },
+        checklistItems: { orderBy: { order: 'asc' } }
       }
     })
 
@@ -101,92 +71,107 @@ export async function PUT(
       return NextResponse.json({ error: "Only the note author or admin can edit this note" }, { status: 403 })
     }
 
-    const updatedNote = await db.note.update({
-      where: { id: noteId },
-      data: {
-        ...(content !== undefined && { content }),
-        ...(color !== undefined && { color }),
-        ...(done !== undefined && { done }),
-        ...(checklistItems !== undefined && { checklistItems }),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+    // Snapshot previous state for Slack
+    const prevContent = note.content
+    const prevItems = note.checklistItems || []
+
+    let createdItems: IncomingChecklistItem[] = []
+    let updatedItems: { id: string; content: string; checked: boolean; order: number; previous: { content: string; checked: boolean; order: number; slackMessageId?: string | null } }[] = []
+    let deletedItems: IncomingChecklistItem[] = []
+
+    const updatedNote = await db.$transaction(async (tx) => {
+      // Update note fields
+      const n = await tx.note.update({
+        where: { id: noteId },
+        data: {
+          ...(content !== undefined && { content }),
+          ...(color !== undefined && { color }),
+          ...(done !== undefined && { done }),
         },
-        board: {
-          select: {
-            name: true,
-            sendSlackUpdates: true
-          }
-        }
-      }
-    })
+        include: {
+          board: true,
+          user: { select: { id: true, name: true, email: true } },
+          checklistItems: { orderBy: { order: 'asc' } },
+        },
+      })
 
-    // Send individual todo notifications if checklist items have changed
-    if (checklistItems !== undefined && user.organization?.slackWebhookUrl) {
-      const oldItems = (note.checklistItems as unknown as ChecklistItem[]) || []
-      const newItems = (checklistItems as unknown as ChecklistItem[]) || []
-      const { addedItems, completedItems } = detectChecklistChanges(oldItems, newItems)
-      
-      const userName = user.name || user.email || 'Unknown User'
-      const boardName = updatedNote.board.name
-      
-      // Send notifications for newly added todos
-      for (const addedItem of addedItems) {
-        if (hasValidContent(addedItem.content) && shouldSendNotification(session.user.id, boardId, boardName, note.board.sendSlackUpdates)) {
-          await sendTodoNotification(
-            user.organization.slackWebhookUrl,
-            addedItem.content,
-            boardName,
-            userName,
-            'added'
-          )
-        }
-      }
-      
-      // Send notifications for newly completed todos
-      for (const completedItem of completedItems) {
-        await sendTodoNotification(
-          user.organization.slackWebhookUrl,
-          completedItem.content,
-          boardName,
-          userName,
-          'completed'
-        )
-      }
-    }
+      // Reconcile checklist items if provided
+      if (Array.isArray(checklistItems)) {
+        const existing = await tx.checklistItem.findMany({ where: { noteId }, orderBy: { order: 'asc' } })
+        const existingMap = new Map(existing.map((i) => [i.id, i]))
+        const incomingMap = new Map((checklistItems as IncomingChecklistItem[]).map((i) => [i.id, i]))
 
-    // Send Slack notification if content is being added to a previously empty note
-    if (content !== undefined && user.organization?.slackWebhookUrl && !note.slackMessageId) {
-      const wasEmpty = !hasValidContent(note.content)
-      const hasContent = hasValidContent(content)
-      
-      if (wasEmpty && hasContent && shouldSendNotification(session.user.id, boardId, updatedNote.board.name, note.board.sendSlackUpdates)) {
-        const slackMessage = formatNoteForSlack(updatedNote, updatedNote.board.name, user.name || user.email || 'Unknown User')
-        const messageId = await sendSlackMessage(user.organization.slackWebhookUrl, {
-          text: slackMessage,
-          username: 'Gumboard',
-          icon_emoji: ':clipboard:'
+        const toCreate = (checklistItems as IncomingChecklistItem[]).filter((i) => !existingMap.has(i.id))
+        const toUpdate = (checklistItems as IncomingChecklistItem[]).filter((i) => {
+          const old = existingMap.get(i.id)
+          return !!old && (old.content !== i.content || old.checked !== i.checked || old.order !== i.order)
         })
+        const toDelete = existing.filter((i) => !incomingMap.has(i.id))
 
-        if (messageId) {
-          await db.note.update({
-            where: { id: noteId },
-            data: { slackMessageId: messageId }
+        if (toDelete.length) {
+          await tx.checklistItem.deleteMany({ where: { id: { in: toDelete.map((i) => i.id) } } })
+        }
+        if (toCreate.length) {
+          await tx.checklistItem.createMany({
+            data: toCreate.map((i) => ({ id: i.id, content: i.content, checked: i.checked, order: i.order, noteId })),
           })
         }
-      }
-    }
+        for (const i of toUpdate) {
+          await tx.checklistItem.update({
+            where: { id: i.id },
+            data: { content: i.content, checked: i.checked, order: i.order },
+          })
+        }
 
-    // Update existing Slack message when done status changes
-    if (done !== undefined && user.organization?.slackWebhookUrl && note.slackMessageId) {
-      const userName = note.user?.name || note.user?.email || 'Unknown User'
-      const boardName = note.board.name
-      await updateSlackMessage(user.organization.slackWebhookUrl, note.content, done, boardName, userName)
+        createdItems = toCreate
+        updatedItems = toUpdate.map((i) => ({ id: i.id, content: i.content, checked: i.checked, order: i.order, previous: { content: existingMap.get(i.id)!.content, checked: existingMap.get(i.id)!.checked, order: existingMap.get(i.id)!.order, slackMessageId: existingMap.get(i.id)!.slackMessageId } }))
+        deletedItems = toDelete.map((i) => ({ id: i.id, content: i.content, checked: i.checked, order: i.order }))
+
+        // Refresh note with updated items
+        return await tx.note.findUnique({
+          where: { id: noteId },
+          include: { board: true, user: { select: { id: true, name: true, email: true } }, checklistItems: { orderBy: { order: 'asc' } } },
+        })
+      }
+
+      return n
+    })
+
+    // Slack notifications centralized
+    if (user.organization?.slackWebhookUrl) {
+      const res = await notifySlackForNoteChanges({
+        webhookUrl: user.organization.slackWebhookUrl,
+        boardName: updatedNote!.board.name,
+        boardId,
+        sendSlackUpdates: updatedNote!.board.sendSlackUpdates,
+        userId: session.user.id,
+        userName: user.name || user.email || 'Unknown User',
+        prevContent,
+        nextContent: content ?? prevContent,
+        noteSlackMessageId: note.slackMessageId,
+        itemChanges: Array.isArray(checklistItems)
+          ? { created: createdItems, updated: updatedItems, deleted: deletedItems }
+          : undefined,
+      })
+
+      if (res.noteMessageId && !note.slackMessageId) {
+        await db.note.update({ where: { id: noteId }, data: { slackMessageId: res.noteMessageId } })
+      }
+      if (res.itemMessageIds) {
+        for (const [itemId, msgId] of Object.entries(res.itemMessageIds)) {
+          await db.checklistItem.update({ where: { id: itemId }, data: { slackMessageId: msgId } })
+        }
+      }
+
+      // Note done toggle message (optional)
+      if (typeof done === 'boolean') {
+        const contentForDone = hasValidContent(updatedNote!.content)
+          ? updatedNote!.content
+          : updatedNote!.checklistItems[0]?.content || 'Note'
+        if (hasValidContent(contentForDone)) {
+          await updateSlackMessage(user.organization.slackWebhookUrl, contentForDone, done, updatedNote!.board.name, user.name || user.email || 'Unknown User')
+        }
+      }
     }
 
     return NextResponse.json({ note: updatedNote })

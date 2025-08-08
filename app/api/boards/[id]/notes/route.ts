@@ -27,7 +27,8 @@ export async function GET(
                 name: true,
                 email: true
               }
-            }
+            },
+            checklistItems: { orderBy: { order: 'asc' } }
           }
         }
       }
@@ -103,23 +104,50 @@ export async function POST(
 
     const randomColor = color || NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)]
 
-    const note = await db.note.create({
-      data: {
-        content,
-        color: randomColor,
-        boardId,
-        createdBy: session.user.id,
-        ...(checklistItems !== undefined && { checklistItems }),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+    const note = await db.$transaction(async (tx) => {
+      const created = await tx.note.create({
+        data: {
+          content,
+          color: randomColor,
+          boardId,
+          createdBy: session.user.id,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
           }
         }
+      })
+
+      if (Array.isArray(checklistItems) && checklistItems.length > 0) {
+        await tx.checklistItem.createMany({
+          data: checklistItems.map((i: { id: string; content: string; checked: boolean; order: number }) => ({
+            id: i.id,
+            content: i.content,
+            checked: i.checked,
+            order: i.order,
+            noteId: created.id,
+          })),
+        })
       }
+
+      return await tx.note.findUnique({
+        where: { id: created.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          checklistItems: { orderBy: { order: 'asc' } }
+        }
+      })
     })
 
     if (user.organization?.slackWebhookUrl && hasValidContent(content) && shouldSendNotification(session.user.id, boardId, board.name, board.sendSlackUpdates)) {
