@@ -1237,63 +1237,7 @@ export default function BoardPage({
 
   // Removed external debounce; Note component handles UX concerns
 
-  const handleToggleAllChecklistItems = async (noteId: string) => {
-    try {
-      const currentNote = notes.find((n) => n.id === noteId);
-      if (!currentNote || !currentNote.checklistItems) return;
-
-      const targetBoardId =
-        boardId === "all-notes" && currentNote.board?.id
-          ? currentNote.board.id
-          : boardId;
-
-      // Check if all items are checked
-      const allChecked = currentNote.checklistItems.every(
-        (item) => item.checked
-      );
-
-      // Toggle all items to opposite state
-      const updatedItems = currentNote.checklistItems.map((item) => ({
-        ...item,
-        checked: !allChecked,
-      }));
-
-      // Sort items: unchecked first, then checked
-      const sortedItems = [
-        ...updatedItems
-          .filter((item) => !item.checked)
-          .sort((a, b) => a.order - b.order),
-        ...updatedItems
-          .filter((item) => item.checked)
-          .sort((a, b) => a.order - b.order),
-      ];
-
-      // The note should be marked as done if all items are checked
-      const noteIsDone = !allChecked; // If all were checked before, we're unchecking them (note becomes undone)
-      // If not all were checked before, we're checking them all (note becomes done)
-
-      const response = await fetch(
-        `/api/boards/${targetBoardId}/notes/${noteId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            checklistItems: sanitizeChecklistItems(sortedItems),
-            done: noteIsDone,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const { note } = await response.json();
-        setNotes(notes.map((n) => (n.id === noteId ? note : n)));
-      }
-    } catch (error) {
-      console.error("Error toggling all checklist items:", error);
-    }
-  };
+  // Removed toggle-all handler; checklist item toggles handled per item
 
   const handleSplitChecklistItem = async (
     noteId: string,
