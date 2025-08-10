@@ -224,9 +224,9 @@ export default function BoardPage({
     const actualNotePadding = notePadding || config.notePadding;
     const actualNoteWidth = noteWidth || config.noteWidth;
 
-    const headerHeight = 76; // User info header + margins (more accurate)
+    const headerHeight = 60; // User info header + margins
     const paddingHeight = actualNotePadding * 2; // Top and bottom padding
-    const minContentHeight = 84; // Minimum content area (3 lines)
+    const minContentHeight = 60; // Minimum content area
 
     if (note.checklistItems) {
       // For checklist items, calculate height based on their wrapped text lines.
