@@ -229,19 +229,38 @@ export default function BoardPage({
     const minContentHeight = 84; // Minimum content area (3 lines)
 
     if (note.checklistItems) {
-      // For checklist items, calculate height based on number of items
-      const itemHeight = 32; // Each checklist item is about 32px tall (text + padding)
-      const itemSpacing = 8; // Space between items
-      const checklistItemsCount = note.checklistItems.length;
-      const addingItemHeight = addingChecklistItem === note.id ? 32 : 0; // Add height for input field
+      // For checklist items, calculate height based on their wrapped text lines.
+      // This prevents large overestimates that create extra whitespace.
+      const avgCharWidth = 9; // px
+      const lineHeight = 24; // leading-6
+      const verticalPaddingPerItem = 4; // py-0.5 top+bottom on text span
+      const interItemSpacing = 4; // space-y-1 between items
+      const contentWidth = actualNoteWidth - actualNotePadding * 2 - 16; // account for gaps
+      const charsPerLine = Math.max(1, Math.floor(contentWidth / avgCharWidth));
 
-      const checklistHeight =
-        checklistItemsCount * itemHeight +
-        (checklistItemsCount - 1) * itemSpacing +
-        addingItemHeight;
+      const checklistItemsHeights = note.checklistItems.map((item) => {
+        const content = item.content || "";
+        const lines = Math.max(
+          1,
+          content
+            .split("\n")
+            .map((ln) => Math.max(1, Math.ceil(ln.length / charsPerLine)))
+            .reduce((a, b) => a + b, 0)
+        );
+        return lines * lineHeight + verticalPaddingPerItem;
+      });
+
+      const itemsHeight = checklistItemsHeights.reduce((a, b) => a + b, 0);
+      const spacingHeight =
+        Math.max(0, note.checklistItems.length - 1) * interItemSpacing;
+      const addingItemHeight = addingChecklistItem === note.id ? 28 : 0; // input row height
+      const checklistHeight = itemsHeight + spacingHeight + addingItemHeight;
+
+      // Extra area for the "Add task" button + its margin
+      const addButtonArea = 36;
+
       const totalChecklistHeight = Math.max(minContentHeight, checklistHeight);
-
-      return headerHeight + paddingHeight + totalChecklistHeight + 40; // Extra space for + button
+      return headerHeight + paddingHeight + totalChecklistHeight + addButtonArea;
     } else {
       // Original logic for regular notes
       const lines = note.content.split("\n");

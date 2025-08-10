@@ -73,14 +73,14 @@ export function ChecklistItem({
   return (
     <div
       className={cn(
-        "flex items-center group/item rounded gap-3 transition-all duration-200",
+        "flex items-start group/item rounded gap-3 transition-all duration-200",
         className
       )}
     >
       <Checkbox
         checked={item.checked}
         onCheckedChange={() => !readonly && onToggle?.(item.id)}
-        className="border-slate-500 bg-white/50 dark:bg-zinc-800 dark:border-zinc-600"
+        className="border-slate-500 bg-white/50 dark:bg-zinc-800 dark:border-zinc-600 self-start mt-1"
         disabled={readonly}
       />
 
