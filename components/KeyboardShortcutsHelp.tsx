@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useBoardActions } from "@/context/BoardActionsContext";
 
 export function KeyboardShortcutsHelp() {
   const [open, setOpen] = useState(false);
@@ -32,15 +33,25 @@ export function KeyboardShortcutsHelp() {
     };
   }, []);
 
-  const shortcuts = [
+  const boardActions = useBoardActions();
+  const isOnBoard = Boolean(boardActions?.currentBoard);
+
+  const globalShortcuts = [
     { keys: "⌘ K", description: "Open command palette" },
+    { keys: "?", description: "Show this help" },
+  ];
+
+  const boardShortcuts = [
     { keys: "⌘ Enter", description: "Create new checklist note" },
     { keys: "⌘ Delete", description: "Delete selected notes" },
     { keys: "/", description: "Focus search" },
     { keys: "Escape", description: "Clear selection / Close" },
     { keys: "⌘ 1-9", description: "Switch to board" },
-    { keys: "?", description: "Show this help" },
   ];
+
+  const shortcuts = isOnBoard
+    ? [...globalShortcuts, ...boardShortcuts]
+    : globalShortcuts;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
