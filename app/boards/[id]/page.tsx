@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { useKeyboardShortcuts, useBoardSwitching } from "@/hooks/useKeyboardShortcuts";
 import { BoardActionsProvider } from "@/context/BoardActionsContext";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1544,14 +1543,7 @@ export default function BoardPage({
         </AlertDialogContent>
       </AlertDialog>
       <CommandPalette boards={allBoards.map(({ id, name }) => ({ id, name }))} />
-      <BoardShortcuts boards={allBoards} />
       </div>
     </BoardActionsProvider>
   );
-}
-
-function BoardShortcuts({ boards }: { boards: { id: string }[] }) {
-  useBoardSwitching(boards);
-  useKeyboardShortcuts();
-  return null;
 }

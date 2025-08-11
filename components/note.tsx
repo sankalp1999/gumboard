@@ -97,6 +97,40 @@ export function Note({
     }
   }, [addingChecklistItem, note.id, canEdit]);
 
+  // Listen for global keyboard shortcut to add checklist item
+  useEffect(() => {
+    const handleAddChecklistItemEvent = () => {
+      if (canEdit && note.checklistItems) {
+        // If currently adding an item, check if it's empty
+        if (addingItem) {
+          // If the current new item is not empty, save it and create a new one
+          if (newItemContent.trim()) {
+            handleAddChecklistItem(newItemContent.trim());
+            setNewItemContent("");
+            // Keep adding mode active for the next item
+            setTimeout(() => {
+              newItemInputRef.current?.focus();
+            }, 50);
+          } else {
+            // If empty, just focus the input
+            newItemInputRef.current?.focus();
+          }
+        } else {
+          // Not currently adding, start adding mode
+          setAddingItem(true);
+          setTimeout(() => {
+            newItemInputRef.current?.focus();
+          }, 50);
+        }
+      }
+    };
+
+    window.addEventListener('gumboard:add-checklist-item', handleAddChecklistItemEvent);
+    return () => {
+      window.removeEventListener('gumboard:add-checklist-item', handleAddChecklistItemEvent);
+    };
+  }, [canEdit, note.checklistItems, addingItem, newItemContent]);
+
   const handleToggleChecklistItem = async (itemId: string) => {
     try {
       if (!note.checklistItems) return;
@@ -362,7 +396,11 @@ export function Note({
     if (newItemContent.trim()) {
       handleAddChecklistItem(newItemContent.trim());
       setNewItemContent("");
-      setAddingItem(false);
+      // Keep adding mode active so user can continue adding items
+      // They can press Escape to stop adding
+      setTimeout(() => {
+        newItemInputRef.current?.focus();
+      }, 50);
     }
   };
 

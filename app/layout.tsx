@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CommandPaletteProvider } from "@/context/CommandPaletteContext";
 import { KeyboardShortcutsHelp } from "@/components/KeyboardShortcutsHelp";
+import { ClientShortcuts } from "@/components/ClientShortcuts";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,6 +39,7 @@ export default function RootLayout({
           <SessionProvider>
             <CommandPaletteProvider>
               {children}
+              <ClientShortcuts />
               <KeyboardShortcutsHelp />
             </CommandPaletteProvider>
           </SessionProvider>

@@ -31,7 +31,6 @@ import { useRouter } from "next/navigation";
 import { FullPageLoader } from "@/components/ui/loader";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import { BoardActionsProvider } from "@/context/BoardActionsContext";
-import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -318,8 +317,6 @@ function DashboardContent() {
     await signOut();
   };
 
-  // Set up keyboard shortcuts
-  useKeyboardShortcuts();
 
   if (loading) {
     return <FullPageLoader message="Loading dashboard..." />;
