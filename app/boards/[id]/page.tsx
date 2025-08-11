@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useKeyboardShortcuts, useBoardSwitching } from "@/hooks/useKeyboardShortcuts";
+import { BoardActionsProvider } from "@/context/BoardActionsContext";
+import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
@@ -82,6 +85,71 @@ export default function BoardPage({
   const boardRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Actions exposed to keyboard shortcuts and command palette
+  const selectedNoteIds = new Set<string>();
+  // We currently don't have multi-select. Keep as empty placeholder for now.
+
+  const createChecklistNote = async () => {
+    try {
+      const targetBoardId = boardId === "all-notes" ? allBoards[0]?.id : boardId;
+      if (!targetBoardId) return;
+      const response = await fetch(`/api/boards/${targetBoardId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "", checklistItems: [] }),
+      });
+      if (response.ok) {
+        const { note } = await response.json();
+        setNotes([...notes, note]);
+        setAddingChecklistItem(note.id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const createTextNote = async () => {
+    try {
+      const targetBoardId = boardId === "all-notes" ? allBoards[0]?.id : boardId;
+      if (!targetBoardId) return;
+      const response = await fetch(`/api/boards/${targetBoardId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "", checklistItems: undefined }),
+      });
+      if (response.ok) {
+        const { note } = await response.json();
+        setNotes([...notes, note]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteSelectedNotes = () => {
+    // Placeholder: No multi-select yet
+  };
+
+  const archiveSelectedNotes = () => {
+    // Placeholder: No multi-select yet
+  };
+
+  const focusSearch = () => {
+    const el = document.getElementById("search-input") as HTMLInputElement | null;
+    el?.focus();
+  };
+
+  const clearSelection = () => {
+    // Placeholder for future multi-select
+  };
+
+  const closeAllModals = () => {
+    setShowBoardDropdown(false);
+    setShowUserDropdown(false);
+    setShowAddBoard(false);
+    setBoardSettingsDialog(false);
+  };
 
   // Update URL with current filter state
   const updateURL = (
@@ -929,8 +997,21 @@ export default function BoardPage({
     );
   }
 
+  const actionsValue = {
+    createChecklistNote,
+    createTextNote,
+    deleteSelectedNotes,
+    archiveSelectedNotes,
+    selectedNoteIds,
+    focusSearch,
+    clearSelection,
+    closeAllModals,
+    currentBoard: board,
+  } as const;
+
   return (
-    <div className="min-h-screen max-w-screen bg-background dark:bg-zinc-950">
+    <BoardActionsProvider value={actionsValue}>
+      <div className="min-h-screen max-w-screen bg-background dark:bg-zinc-950">
       <div className="bg-card dark:bg-zinc-900 border-b border-border dark:border-zinc-800 shadow-sm">
         <div className="flex flex-wrap sm:flex-nowrap justify-between items-center h-auto sm:h-16 p-2 sm:p-0">
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:space-x-3 w-full sm:w-auto">
@@ -1082,7 +1163,7 @@ export default function BoardPage({
           {/* Right side - Search, Add Note and User dropdown */}
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
             {/* Search Box */}
-            <div className="relative flex-1 sm:flex-none min-w-[150px]">
+              <div className="relative flex-1 sm:flex-none min-w-[150px]">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-muted-foreground dark:text-zinc-400" />
               </div>
@@ -1090,6 +1171,7 @@ export default function BoardPage({
                 aria-label="Search notes"
                 type="text"
                 placeholder="Search notes..."
+                  id="search-input"
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -1461,6 +1543,15 @@ export default function BoardPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      <CommandPalette boards={allBoards.map(({ id, name }) => ({ id, name }))} />
+      <BoardShortcuts boards={allBoards} />
+      </div>
+    </BoardActionsProvider>
   );
+}
+
+function BoardShortcuts({ boards }: { boards: { id: string }[] }) {
+  useBoardSwitching(boards);
+  useKeyboardShortcuts();
+  return null;
 }
