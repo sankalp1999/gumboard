@@ -419,6 +419,7 @@ test.describe('Archive Functionality', () => {
                 content: 'Note for archive-unarchive workflow test',
                 color: '#fef3c7',
                 done: false,
+                boardId: 'test-board',
                 checklistItems: [],
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
