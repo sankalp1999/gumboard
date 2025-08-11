@@ -390,7 +390,6 @@ export default function PublicBoardPage({
     };
   }, []);
 
-  // replaced by useCallback version above
 
   const uniqueAuthors = useMemo(() => getUniqueAuthors(notes), [notes]);
 
