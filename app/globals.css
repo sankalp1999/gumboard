@@ -3,20 +3,20 @@
 
 /* Command Palette (cmdk) selection styles */
 [data-selected="true"] {
-  @apply bg-gray-100 text-gray-900;
+  @apply bg-zinc-200 text-zinc-900;
 }
 
 .dark [data-selected="true"] {
-  @apply bg-gray-800 text-gray-100;
+  @apply bg-zinc-700 text-zinc-100;
 }
 
 /* Alternative selectors for cmdk */
 [cmdk-item][data-selected="true"],
 [cmdk-item][aria-selected="true"] {
-  @apply bg-gray-100 text-gray-900;
+  @apply bg-zinc-200 text-zinc-900;
 }
 
 .dark [cmdk-item][data-selected="true"],
 .dark [cmdk-item][aria-selected="true"] {
-  @apply bg-gray-800 text-gray-100;
+  @apply bg-zinc-700 text-zinc-100;
 }

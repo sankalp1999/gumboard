@@ -84,14 +84,13 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setOpen(false)} />}
       <Command.Dialog
         open={open}
         onOpenChange={setOpen}
         label="Global Command Menu"
       >
         <DialogTitle className="sr-only">Command Palette</DialogTitle>
-        <Command className="fixed left-1/2 top-20 z-50 w-full max-w-2xl -translate-x-1/2 bg-background rounded-lg shadow-2xl border border-border">
+        <Command className="fixed left-1/2 top-20 z-50 w-full max-w-2xl -translate-x-1/2 bg-white dark:bg-zinc-900 rounded-lg shadow-2xl border border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center px-4 py-3 border-b border-border">
             <SearchIcon className="mr-2 h-4 w-4 text-muted-foreground" />
             <Command.Input
@@ -117,7 +116,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   boardActions?.createChecklistNote();
                   setOpen(false);
                 }}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100"
               >
                 <CheckSquare className="mr-2 h-4 w-4" />
                 <span>New Checklist Note</span>
@@ -130,7 +129,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   boardActions?.createTextNote();
                   setOpen(false);
                 }}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100"
               >
                 <StickyNote className="mr-2 h-4 w-4" />
                 <span>New Text Note</span>
@@ -148,7 +147,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   window.dispatchEvent(event);
                   setOpen(false);
                 }}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100"
               >
                 <CheckSquare className="mr-2 h-4 w-4" />
                 <span>Add Checklist Item</span>
@@ -205,7 +204,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                     router.push(`/boards/${board.id}`);
                     setOpen(false);
                   }}
-                  className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100"
+                  className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100"
                 >
                   <Folder className="mr-2 h-4 w-4" />
                   <span>{board.name}</span>
@@ -226,7 +225,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   boardActions?.focusSearch();
                   setOpen(false);
                 }}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100"
               >
                 <SearchIcon className="mr-2 h-4 w-4" />
                 <span>Search Notes</span>
@@ -242,7 +241,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   setOpen(false);
                 }}
                 disabled={(boardActions.selectedNoteIds?.size || 0) === 0}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 <span>Delete Selected</span>
@@ -256,7 +255,7 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   setOpen(false);
                 }}
                 disabled={(boardActions.selectedNoteIds?.size || 0) === 0}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100 data-[selected=true]:bg-gray-100 data-[selected=true]:text-gray-900 dark:data-[selected=true]:bg-gray-800 dark:data-[selected=true]:text-gray-100 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-zinc-100 dark:hover:bg-zinc-800 data-[selected=true]:bg-zinc-200 data-[selected=true]:text-zinc-900 dark:data-[selected=true]:bg-zinc-700 dark:data-[selected=true]:text-zinc-100 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
               >
                 <Archive className="mr-2 h-4 w-4" />
                 <span>Archive Selected</span>
