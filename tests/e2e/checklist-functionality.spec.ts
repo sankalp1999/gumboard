@@ -596,4 +596,102 @@ test.describe('Checklist Functionality', () => {
     await expect(page.locator('text=First item')).toBeVisible();
     await expect(newEmptyInput).toHaveValue('Second item');
   });
+
+  test('should split new item input when pressing Enter in the middle', async ({ page }) => {
+    let lastPutBody: any = null;
+    
+    await page.route('**/api/boards/test-board/notes', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            notes: [
+              {
+                id: 'split-new-item-note',
+                content: '',
+                color: '#fef3c7',
+                done: false,
+                x: 100,
+                y: 100,
+                width: 200,
+                height: 150,
+                checklistItems: [
+                  { id: 'item-1', content: 'Existing task', checked: false, order: 0 }
+                ],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                user: { id: 'test-user', name: 'Test User', email: 'test@example.com' },
+                board: { id: 'test-board', name: 'Test Board' },
+                boardId: 'test-board',
+              }
+            ],
+          }),
+        });
+      }
+    });
+    
+    await page.route('**/api/boards/test-board/notes/split-new-item-note', async (route) => {
+      if (route.request().method() === 'PUT') {
+        lastPutBody = await route.request().postDataJSON();
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            note: {
+              id: 'split-new-item-note',
+              content: '',
+              color: '#fef3c7',
+              done: false,
+              x: 100,
+              y: 100,
+              width: 200,
+              height: 150,
+              checklistItems: lastPutBody.checklistItems || [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              user: { id: 'test-user', name: 'Test User', email: 'test@example.com' },
+              board: { id: 'test-board', name: 'Test Board' },
+              boardId: 'test-board',
+            },
+          }),
+        });
+      }
+    });
+    
+    // Navigate after routes are registered so initial fetch is intercepted
+    await page.goto('/boards/test-board');
+    
+    // Open the new item input
+    const addTaskButton = page.locator('button:has-text("Add task")');
+    await expect(addTaskButton).toBeVisible();
+    await addTaskButton.click();
+    
+    const newItemInput = page.locator('input[placeholder="Add new item..."]');
+    await expect(newItemInput).toBeVisible();
+    await expect(newItemInput).toBeFocused();
+    
+    // Type text and place cursor in the middle between words
+    await newItemInput.fill('Alpha Beta');
+    await newItemInput.evaluate((el) => (el as HTMLInputElement).setSelectionRange(6, 6));
+    
+    // Press Enter to split
+    await newItemInput.press('Enter');
+    
+    // The input should remain for the second half and be focused
+    await expect(newItemInput).toBeVisible();
+    await expect(newItemInput).toBeFocused();
+    await expect(newItemInput).toHaveValue('Beta');
+    
+    // The first half should be added as a checklist item
+    await expect(page.getByText('Alpha')).toBeVisible();
+    
+    // If API was called, verify payload includes the new item with correct ordering
+    if (lastPutBody?.checklistItems) {
+      const contents = lastPutBody.checklistItems.map((i: any) => i.content);
+      expect(contents).toEqual(['Existing task', 'Alpha']);
+      const orders = lastPutBody.checklistItems.map((i: any) => i.order);
+      expect(orders).toEqual([0, 1]);
+    }
+  });
 });
