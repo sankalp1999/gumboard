@@ -486,4 +486,100 @@ test.describe('Checklist Functionality', () => {
       expect(itemTexts).toContain('New added item');
     }
   });
+
+  test('should create new checklist item when pressing Enter at end of item', async ({ page }) => {
+    await page.route('**/api/boards/test-board/notes', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            notes: [
+              {
+                id: 'test-note-1',
+                content: '',
+                color: '#fef3c7',
+                done: false,
+                x: 100,
+                y: 100,
+                width: 200,
+                height: 150,
+                checklistItems: [
+                  {
+                    id: 'item-1',
+                    content: 'First item',
+                    checked: false,
+                    order: 0
+                  }
+                ],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                user: {
+                  id: 'test-user',
+                  name: 'Test User',
+                  email: 'test@example.com',
+                },
+              }
+            ],
+          }),
+        });
+      }
+    });
+
+    await page.route('**/api/boards/test-board/notes/test-note-1', async (route) => {
+      if (route.request().method() === 'PUT') {
+        const requestBody = await route.request().postDataJSON();
+        
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            note: {
+              id: 'test-note-1',
+              content: '',
+              color: '#fef3c7',
+              done: false,
+              x: 100,
+              y: 100,
+              width: 200,
+              height: 150,
+              checklistItems: requestBody.checklistItems || [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              user: {
+                id: 'test-user',
+                name: 'Test User',
+                email: 'test@example.com',
+              },
+            },
+          }),
+        });
+      }
+    });
+    await expect(page.locator('text=First item')).toBeVisible();
+    
+    const checklistItemElement = page.locator('span.flex-1.text-sm.leading-6.cursor-pointer').filter({ hasText: 'First item' });
+    await checklistItemElement.click();
+    
+    const inputElement = page.locator('[data-testid="item-1"] input[type="text"]');
+    await expect(inputElement).toBeVisible();
+    await expect(inputElement).toBeFocused();
+    
+    await inputElement.press('End');
+    await inputElement.press('Enter');
+    
+    await page.waitForTimeout(500);
+    
+    const allChecklistInputs = page.locator('div.flex.items-center.group\\/item input[type="text"]');
+    await expect(allChecklistInputs).toHaveCount(2);
+    
+    const newEmptyInput = allChecklistInputs.nth(1);
+    await expect(newEmptyInput).toBeVisible();
+    await expect(newEmptyInput).toBeFocused();
+    
+    await newEmptyInput.fill('Second item');
+    
+    await expect(page.locator('text=First item')).toBeVisible();
+    await expect(newEmptyInput).toHaveValue('Second item');
+  });
 });

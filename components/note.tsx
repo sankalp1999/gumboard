@@ -236,6 +236,67 @@ export function Note({
     }
   };
 
+  const handleAddChecklistItemAfter = async (afterItemId: string) => {
+    try {
+      if (!note.checklistItems) return;
+
+      const currentItemIndex = note.checklistItems.findIndex(
+        (item) => item.id === afterItemId
+      );
+      
+      if (currentItemIndex === -1) return;
+
+      const newItem = {
+        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        content: "",
+        checked: false,
+        order: 0,
+      };
+
+      const allItemsUnsorted = [
+        ...note.checklistItems.slice(0, currentItemIndex + 1),
+        newItem,
+        ...note.checklistItems.slice(currentItemIndex + 1)
+      ];
+
+      const allItems = allItemsUnsorted.map((item, index) => ({
+        ...item,
+        order: index
+      }));
+
+      const optimisticNote = {
+        ...note,
+        checklistItems: allItems,
+      };
+
+      onUpdate?.(optimisticNote);
+
+      // Set the new item to editing mode
+      setEditingItem(newItem.id);
+      setEditingItemContent("");
+
+      if (syncDB) {
+        const response = await fetch(
+          `/api/boards/${note.boardId}/notes/${note.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              checklistItems: allItems,
+            }),
+          }
+        );
+
+        if (response.ok) {
+          const { note: updatedNote } = await response.json();
+          onUpdate?.(updatedNote);
+        }
+      }
+    } catch (error) {
+      console.error("Error adding checklist item after:", error);
+    }
+  };
+
   const handleSplitChecklistItem = async (
     itemId: string,
     content: string,
@@ -460,6 +521,8 @@ export function Note({
     if (newItemContent.trim()) {
       handleAddChecklistItem(newItemContent.trim());
       setNewItemContent("");
+      // Keep adding mode active for continuous item addition
+    } else {
       setAddingItem(false);
     }
   };
@@ -467,7 +530,27 @@ export function Note({
   const handleKeyDownNewItem = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleAddItem();
+      const target = e.target as HTMLInputElement;
+      const cursorPosition = target.selectionStart || 0;
+      const textLength = newItemContent.length;
+      
+      if (cursorPosition < textLength) {
+        // Split behavior: cursor is in the middle
+        const firstHalf = newItemContent.substring(0, cursorPosition).trim();
+        const secondHalf = newItemContent.substring(cursorPosition).trim();
+        
+        if (firstHalf) {
+          handleAddChecklistItem(firstHalf);
+        }
+        
+        // Keep the second half in the input
+        setNewItemContent(secondHalf);
+      } else if (newItemContent.trim()) {
+        // Normal behavior: cursor is at the end
+        handleAddChecklistItem(newItemContent.trim());
+        setNewItemContent("");
+        // Keep adding mode active for continuous item addition
+      }
     }
     if (e.key === "Escape") {
       setAddingItem(false);
@@ -597,6 +680,7 @@ export function Note({
                 onEdit={handleEditItem}
                 onDelete={handleDeleteItem}
                 onSplit={handleSplitItem}
+                onAddAfter={handleAddChecklistItemAfter}
                 isEditing={editingItem === item.id}
                 editContent={editingItem === item.id ? editingItemContent : undefined}
                 onEditContentChange={setEditingItemContent}

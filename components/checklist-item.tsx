@@ -20,6 +20,7 @@ interface ChecklistItemProps {
   onEdit?: (itemId: string, content: string) => void;
   onDelete?: (itemId: string) => void;
   onSplit?: (itemId: string, content: string, cursorPosition: number) => void;
+  onAddAfter?: (itemId: string) => void;
   isEditing?: boolean;
   editContent?: string;
   onEditContentChange?: (content: string) => void;
@@ -36,6 +37,7 @@ export function ChecklistItem({
   onEdit,
   onDelete,
   onSplit,
+  onAddAfter,
   isEditing,
   editContent,
   onEditContentChange,
@@ -50,7 +52,17 @@ export function ChecklistItem({
       e.preventDefault();
       const target = e.target as HTMLInputElement;
       const cursorPosition = target.selectionStart || 0;
-      if (onSplit && editContent !== undefined) {
+      const textLength = editContent?.length || 0;
+      
+      // If cursor is at the end of the text, create a new item below
+      if (cursorPosition === textLength && onAddAfter && editContent !== undefined) {
+        // Save current item first if it has content
+        if (editContent.trim() && onEdit) {
+          onEdit(item.id, editContent);
+        }
+        onAddAfter(item.id);
+      } else if (onSplit && editContent !== undefined) {
+        // If cursor is in the middle, split as usual
         onSplit(item.id, editContent, cursorPosition);
       }
     }
