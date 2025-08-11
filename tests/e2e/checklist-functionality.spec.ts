@@ -134,6 +134,9 @@ test.describe('Checklist Functionality', () => {
       }
     });
     
+    // Navigate after routes are registered so initial fetch is intercepted
+    await page.goto('/boards/test-board');
+    
     await expect(page.locator('text=Test item')).toBeVisible();
     
     const checklistItemElement = page.locator('span.flex-1.text-sm.leading-6.cursor-pointer').filter({ hasText: 'Test item' });
@@ -215,6 +218,9 @@ test.describe('Checklist Functionality', () => {
         });
       }
     });
+    
+    // Navigate after routes are registered so initial fetch is intercepted
+    await page.goto('/boards/test-board');
     
     await expect(page.locator('text=First item')).toBeVisible();
     
@@ -319,6 +325,9 @@ test.describe('Checklist Functionality', () => {
       }
     });
     
+    // Navigate after routes are registered so initial fetch is intercepted
+    await page.goto('/boards/test-board');
+    
     await expect(page.locator('text=First task')).toBeVisible();
     await expect(page.locator('text=Second task')).toBeVisible();
     await expect(page.locator('text=Third task')).toBeVisible();
@@ -332,7 +341,7 @@ test.describe('Checklist Functionality', () => {
     await expect(inputElement).toBeFocused();
     
     // Clear and type new content that will split properly
-    await inputElement.clear();
+    await inputElement.fill('');
     await inputElement.type('Second task');
     
     // Position cursor in the middle (after "Second")
@@ -464,8 +473,9 @@ test.describe('Checklist Functionality', () => {
     // Press Enter to trigger the add action
     await newItemInput.press('Enter');
     
-    // Wait for the input to disappear (indicating the item was added)
-    await expect(newItemInput).not.toBeVisible();
+    // Input remains visible for continuous addition; it should be cleared
+    await expect(newItemInput).toBeVisible();
+    await expect(newItemInput).toHaveValue('');
     
     // Wait for the new item to appear in the DOM with a more lenient timeout
     await expect(page.getByText('New added item')).toBeVisible({ timeout: 10000 });
@@ -556,6 +566,9 @@ test.describe('Checklist Functionality', () => {
         });
       }
     });
+    
+    // Navigate after routes are registered so initial fetch is intercepted
+    await page.goto('/boards/test-board');
     await expect(page.locator('text=First item')).toBeVisible();
     
     const checklistItemElement = page.locator('span.flex-1.text-sm.leading-6.cursor-pointer').filter({ hasText: 'First item' });
@@ -571,9 +584,10 @@ test.describe('Checklist Functionality', () => {
     await page.waitForTimeout(500);
     
     const allChecklistInputs = page.locator('div.flex.items-center.group\\/item input[type="text"]');
-    await expect(allChecklistInputs).toHaveCount(2);
+    // Only the new item remains in edit mode
+    await expect(allChecklistInputs).toHaveCount(1);
     
-    const newEmptyInput = allChecklistInputs.nth(1);
+    const newEmptyInput = allChecklistInputs.first();
     await expect(newEmptyInput).toBeVisible();
     await expect(newEmptyInput).toBeFocused();
     

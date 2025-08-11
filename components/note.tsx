@@ -724,12 +724,18 @@ export function Note({
           {canEdit && (
             <Button
               variant="ghost"
+              onMouseDown={(e) => {
+                // Prevent input blur from hiding the add-new input before we refocus it
+                e.preventDefault();
+              }}
               onClick={() => {
-                if (addingItem && newItemInputRef.current && newItemContent.length === 0) {
-                  newItemInputRef.current.focus();
-                } else {
-                  setAddingItem(true);
-                }
+                // Always enable adding mode and focus the input after render
+                setAddingItem(true);
+                setTimeout(() => {
+                  if (newItemInputRef.current) {
+                    newItemInputRef.current.focus();
+                  }
+                }, 0);
               }}
               className="mt-3 justify-start text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100"
             >
