@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
@@ -81,7 +81,7 @@ export default function PublicBoardPage({
     }
   };
 
-  const calculateNoteHeight = (
+  const calculateNoteHeight = useCallback((
     note: Note,
     noteWidth?: number,
     notePadding?: number
@@ -129,7 +129,7 @@ export default function PublicBoardPage({
         headerHeight + paddingHeight + Math.max(minContentHeight, contentHeight)
       );
     }
-  };
+  }, []);
 
   const getUniqueAuthors = (notes: Note[]) => {
     const authorsMap = new Map<
@@ -212,7 +212,7 @@ export default function PublicBoardPage({
     return filteredNotes;
   };
 
-  const calculateGridLayout = () => {
+  const calculateGridLayout = useCallback((notesToLayout: Note[]) => {
     if (typeof window === "undefined") return [];
 
     const config = getResponsiveConfig();
@@ -240,7 +240,7 @@ export default function PublicBoardPage({
       config.containerPadding
     );
 
-    return filteredNotes.map((note) => {
+    return notesToLayout.map((note) => {
       const noteHeight = calculateNoteHeight(
         note,
         adjustedNoteWidth,
@@ -270,9 +270,9 @@ export default function PublicBoardPage({
         height: noteHeight,
       };
     });
-  };
+  }, [calculateNoteHeight]);
 
-  const calculateMobileLayout = () => {
+  const calculateMobileLayout = useCallback((notesToLayout: Note[]) => {
     if (typeof window === "undefined") return [];
 
     const config = getResponsiveConfig();
@@ -291,7 +291,7 @@ export default function PublicBoardPage({
       config.containerPadding
     );
 
-    return filteredNotes.map((note) => {
+    return notesToLayout.map((note) => {
       const noteHeight = calculateNoteHeight(
         note,
         noteWidth,
@@ -322,7 +322,7 @@ export default function PublicBoardPage({
         height: noteHeight,
       };
     });
-  };
+  }, [calculateNoteHeight]);
 
   useEffect(() => {
     const initializeParams = async () => {
@@ -332,36 +332,7 @@ export default function PublicBoardPage({
     initializeParams();
   }, [params]);
 
-  useEffect(() => {
-    if (boardId) {
-      fetchBoardData();
-    }
-  }, [boardId]);
-
-  useEffect(() => {
-    let resizeTimeout: NodeJS.Timeout;
-
-    const checkResponsive = () => {
-      if (typeof window !== "undefined") {
-        const width = window.innerWidth;
-        setIsMobile(width < 768);
-
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-          setNotes((prevNotes) => [...prevNotes]);
-        }, 50);
-      }
-    };
-
-    checkResponsive();
-    window.addEventListener("resize", checkResponsive);
-    return () => {
-      window.removeEventListener("resize", checkResponsive);
-      clearTimeout(resizeTimeout);
-    };
-  }, []);
-
-  const fetchBoardData = async () => {
+  const fetchBoardData = useCallback(async () => {
     try {
       const boardResponse = await fetch(`/api/boards/${boardId}`);
       if (boardResponse.status === 404) {
@@ -388,7 +359,38 @@ export default function PublicBoardPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [boardId, router]);
+
+  useEffect(() => {
+    if (boardId) {
+      fetchBoardData();
+    }
+  }, [boardId, fetchBoardData]);
+
+  useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout;
+
+    const checkResponsive = () => {
+      if (typeof window !== "undefined") {
+        const width = window.innerWidth;
+        setIsMobile(width < 768);
+
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          setNotes((prevNotes) => [...prevNotes]);
+        }, 50);
+      }
+    };
+
+    checkResponsive();
+    window.addEventListener("resize", checkResponsive);
+    return () => {
+      window.removeEventListener("resize", checkResponsive);
+      clearTimeout(resizeTimeout);
+    };
+  }, []);
+
+  // replaced by useCallback version above
 
   const uniqueAuthors = useMemo(() => getUniqueAuthors(notes), [notes]);
 
@@ -404,7 +406,7 @@ export default function PublicBoardPage({
   );
 
   const layoutNotes = useMemo(
-    () => (isMobile ? calculateMobileLayout() : calculateGridLayout()),
+    () => (isMobile ? calculateMobileLayout(filteredNotes) : calculateGridLayout(filteredNotes)),
     [isMobile, filteredNotes, calculateMobileLayout, calculateGridLayout]
   );
 

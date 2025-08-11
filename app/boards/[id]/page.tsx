@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -216,7 +216,7 @@ export default function BoardPage({
   };
 
   // Helper function to calculate note height based on content
-  const calculateNoteHeight = (
+  const calculateNoteHeight = useCallback((
     note: Note,
     noteWidth?: number,
     notePadding?: number
@@ -275,10 +275,10 @@ export default function BoardPage({
         headerHeight + paddingHeight + Math.max(minContentHeight, contentHeight)
       );
     }
-  };
+  }, [addingChecklistItem]);
 
   // Helper function to calculate bin-packed layout for desktop
-  const calculateGridLayout = () => {
+  const calculateGridLayout = useCallback((notesToLayout: Note[]) => {
     if (typeof window === "undefined") return [];
 
     const config = getResponsiveConfig();
@@ -311,7 +311,7 @@ export default function BoardPage({
       config.containerPadding
     );
 
-    return filteredNotes.map((note) => {
+    return notesToLayout.map((note) => {
       const noteHeight = calculateNoteHeight(
         note,
         adjustedNoteWidth,
@@ -344,10 +344,10 @@ export default function BoardPage({
         height: noteHeight,
       };
     });
-  };
+  }, [calculateNoteHeight]);
 
   // Helper function to calculate mobile layout (optimized single/double column)
-  const calculateMobileLayout = () => {
+  const calculateMobileLayout = useCallback((notesToLayout: Note[]) => {
     if (typeof window === "undefined") return [];
 
     const config = getResponsiveConfig();
@@ -368,7 +368,7 @@ export default function BoardPage({
       config.containerPadding
     );
 
-    return filteredNotes.map((note) => {
+    return notesToLayout.map((note) => {
       const noteHeight = calculateNoteHeight(
         note,
         noteWidth,
@@ -402,7 +402,7 @@ export default function BoardPage({
         height: noteHeight,
       };
     });
-  };
+  }, [calculateNoteHeight]);
 
   useEffect(() => {
     const initializeParams = async () => {
@@ -498,14 +498,15 @@ export default function BoardPage({
     };
   }, []);
 
+  const updateURLMemo = useCallback(updateURL, [searchTerm, dateRange, selectedAuthor, router]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-      updateURL(searchTerm);
+      updateURLMemo(searchTerm);
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, updateURLMemo]);
 
   // Get unique authors from notes
   const getUniqueAuthors = (notes: Note[]) => {
@@ -623,8 +624,8 @@ export default function BoardPage({
     [notes, debouncedSearchTerm, dateRange, selectedAuthor, user]
   );
   const layoutNotes = useMemo(
-    () => (isMobile ? calculateMobileLayout() : calculateGridLayout()),
-    [isMobile, calculateMobileLayout, calculateGridLayout]
+    () => (isMobile ? calculateMobileLayout(filteredNotes) : calculateGridLayout(filteredNotes)),
+    [isMobile, filteredNotes, calculateGridLayout, calculateMobileLayout]
   );
 
   const boardHeight = useMemo(() => {
