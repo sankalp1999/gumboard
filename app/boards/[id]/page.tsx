@@ -823,7 +823,9 @@ export default function BoardPage({
       const currentNote = notes.find((n) => n.id === noteId);
       if (!currentNote) return;
 
-      const targetBoardId = currentNote?.board?.id ?? currentNote.boardId;
+      // Fallback to current page's boardId when note payload doesn't include board info (e.g., in tests)
+      const targetBoardId = currentNote?.board?.id ?? currentNote.boardId ?? boardId;
+      if (!targetBoardId) return;
 
       setNotes(notes.filter((n) => n.id !== noteId));
 
@@ -854,7 +856,8 @@ export default function BoardPage({
       const currentNote = notes.find((n) => n.id === noteId);
       if (!currentNote) return;
       
-      const targetBoardId = currentNote.board?.id ?? currentNote.boardId;
+      // Fallback to current page's boardId when note payload doesn't include board info (e.g., in tests)
+      const targetBoardId = currentNote.board?.id ?? currentNote.boardId ?? boardId;
       if (!targetBoardId) return;
 
       setNotes(notes.filter((n) => n.id !== noteId));

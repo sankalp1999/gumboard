@@ -462,10 +462,49 @@ test.describe('Archive Functionality', () => {
     await page.goto('/boards/test-board');
     await expect(page.locator('text=Note for archive-unarchive workflow test')).toBeVisible();
 
-    const archiveButton = page.locator('[title="Archive note"]');
+    // Debug: Take screenshot before clicking
+    await page.screenshot({ path: 'test-debug-screenshot.png' });
+    
+    // Debug: Check if archive button exists
+    const archiveButtonCount = await page.locator('[title="Archive note"]').count();
+    console.log('Archive buttons found:', archiveButtonCount);
+    
+    // If no buttons with title, try other selectors
+    if (archiveButtonCount === 0) {
+      const buttonsWithArchiveIcon = await page.locator('button:has(svg)').count();
+      console.log('Buttons with SVG icons found:', buttonsWithArchiveIcon);
+      
+      // Log all button titles for debugging
+      const buttons = await page.locator('button').all();
+      for (const button of buttons) {
+        const title = await button.getAttribute('title');
+        if (title) {
+          console.log('Button title:', title);
+        }
+      }
+    }
+
+    const archiveButton = page.locator('[title="Archive note"]').first();
     await archiveButton.click();
     await page.waitForTimeout(500);
-    await expect(page.locator('text=Note for archive-unarchive workflow test')).not.toBeVisible();
+    
+    // Wait for either success (note disappears) or failure (error dialog appears)
+    const result = await Promise.race([
+      page.locator('text=Note for archive-unarchive workflow test').first()
+        .waitFor({ state: 'hidden', timeout: 5000 })
+        .then(() => 'success'),
+      page.locator('role=alertdialog[name="Archive Failed"]')
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => 'error')
+    ]).catch(() => 'timeout');
+
+    if (result === 'error') {
+      await page.locator('button:has-text("OK")').click();
+      throw new Error('Archive operation failed');
+    }
+    
+    // Note should now be hidden
+    await expect(page.locator('text=Note for archive-unarchive workflow test').first()).not.toBeVisible();
 
   });
 });
