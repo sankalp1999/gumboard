@@ -3,10 +3,10 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import Resend from "next-auth/providers/resend"
 import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
-import { db } from "@/lib/db"
+import { db as prisma } from "@/lib/db"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(db),
+  adapter: PrismaAdapter(prisma),
   providers: [
     Resend({
       from: process.env.EMAIL_FROM!,
