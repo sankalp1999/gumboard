@@ -85,7 +85,7 @@ export default function BoardPage({
   const searchParams = useSearchParams();
 
   // Update URL with current filter state
-  const updateURL = (
+  const updateURL = useCallback((
     newSearchTerm?: string,
     newDateRange?: { startDate: Date | null; endDate: Date | null },
     newAuthor?: string | null
@@ -123,7 +123,7 @@ export default function BoardPage({
     const queryString = params.toString();
     const newURL = queryString ? `?${queryString}` : window.location.pathname;
     router.replace(newURL, { scroll: false });
-  };
+  }, [searchTerm, dateRange, selectedAuthor, router]);
 
   // Initialize filters from URL parameters
   const initializeFiltersFromURL = () => {
@@ -498,15 +498,14 @@ export default function BoardPage({
     };
   }, []);
 
-  const updateURLMemo = useCallback(updateURL, [searchTerm, dateRange, selectedAuthor, router]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-      updateURLMemo(searchTerm);
+      updateURL(searchTerm);
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, updateURLMemo]);
+  }, [searchTerm, updateURL]);
 
   // Get unique authors from notes
   const getUniqueAuthors = (notes: Note[]) => {
