@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useEffect } from "react";
 import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -32,17 +31,6 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
     setOpen(true);
   });
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setOpen(true);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [setOpen]);
-
   return (
     <Command.Dialog
       open={open}
@@ -50,28 +38,34 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
       label="Global Command Menu"
       className="fixed inset-0 z-50 bg-black/50"
     >
-      <div className="mx-auto max-w-2xl mt-20 bg-white dark:bg-zinc-900 rounded-lg shadow-2xl border border-border dark:border-zinc-800">
-        <div className="flex items-center px-4 py-3 border-b border-border dark:border-zinc-800">
+      <div className="mx-auto max-w-2xl mt-20 bg-background rounded-lg shadow-2xl border border-border">
+        <div className="sr-only" id="command-palette-title">
+          Command Palette
+        </div>
+        <div className="flex items-center px-4 py-3 border-b border-border">
           <SearchIcon className="mr-2 h-4 w-4 text-muted-foreground" />
           <Command.Input
             placeholder="Type a command or search..."
-            className="w-full bg-transparent outline-none text-sm"
+            className="w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground"
           />
         </div>
 
         <Command.List className="max-h-96 overflow-y-auto p-2">
-          <Command.Empty>No results found.</Command.Empty>
+          <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
+            No results found.
+          </Command.Empty>
 
-          <Command.Group heading="Create">
+          <Command.Group heading="Create" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
             <Command.Item
               onSelect={() => {
                 boardActions?.createChecklistNote();
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <CheckSquare className="mr-2 h-4 w-4" />
-              New Checklist Note
-              <kbd className="ml-auto text-xs">⌘↵</kbd>
+              <span>New Checklist Note</span>
+              <kbd className="ml-auto px-1.5 py-0.5 bg-muted rounded text-xs font-mono">⌘↵</kbd>
             </Command.Item>
 
             <Command.Item
@@ -79,21 +73,23 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                 boardActions?.createTextNote();
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <StickyNote className="mr-2 h-4 w-4" />
-              New Text Note
+              <span>New Text Note</span>
             </Command.Item>
           </Command.Group>
 
-          <Command.Group heading="Navigate">
+          <Command.Group heading="Navigate" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
             <Command.Item
               onSelect={() => {
                 router.push("/dashboard");
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <Home className="mr-2 h-4 w-4" />
-              Go to Dashboard
+              <span>Go to Dashboard</span>
             </Command.Item>
 
             <Command.Item
@@ -101,9 +97,10 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                 router.push("/boards/all-notes");
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <Grid3x3 className="mr-2 h-4 w-4" />
-              All Notes
+              <span>All Notes</span>
             </Command.Item>
 
             <Command.Item
@@ -111,14 +108,15 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                 router.push("/boards/archive");
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <Archive className="mr-2 h-4 w-4" />
-              Archive
+              <span>Archive</span>
             </Command.Item>
           </Command.Group>
 
           {boards?.length > 0 && (
-            <Command.Group heading="Boards">
+            <Command.Group heading="Boards" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
               {boards.map((board, index) => (
                 <Command.Item
                   key={board.id}
@@ -126,11 +124,12 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                     router.push(`/boards/${board.id}`);
                     setOpen(false);
                   }}
+                  className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
                 >
                   <Folder className="mr-2 h-4 w-4" />
-                  {board.name}
+                  <span>{board.name}</span>
                   {index < 9 && (
-                    <kbd className="ml-auto text-xs">⌘{index + 1}</kbd>
+                    <kbd className="ml-auto px-1.5 py-0.5 bg-muted rounded text-xs font-mono">⌘{index + 1}</kbd>
                   )}
                 </Command.Item>
               ))}
@@ -138,16 +137,17 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
           )}
 
           {boardActions?.currentBoard && (
-            <Command.Group heading="Current Board">
+            <Command.Group heading="Current Board" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
               <Command.Item
                 onSelect={() => {
                   boardActions?.focusSearch();
                   setOpen(false);
                 }}
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
               >
                 <SearchIcon className="mr-2 h-4 w-4" />
-                Search Notes
-                <kbd className="ml-auto text-xs">/</kbd>
+                <span>Search Notes</span>
+                <kbd className="ml-auto px-1.5 py-0.5 bg-muted rounded text-xs font-mono">/</kbd>
               </Command.Item>
 
               <Command.Item
@@ -158,10 +158,11 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   setOpen(false);
                 }}
                 disabled={(boardActions.selectedNoteIds?.size || 0) === 0}
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete Selected
-                <kbd className="ml-auto text-xs">⌘⌫</kbd>
+                <span>Delete Selected</span>
+                <kbd className="ml-auto px-1.5 py-0.5 bg-muted rounded text-xs font-mono">⌘⌫</kbd>
               </Command.Item>
 
               <Command.Item
@@ -169,22 +170,25 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                   boardActions.archiveSelectedNotes();
                   setOpen(false);
                 }}
+                disabled={(boardActions.selectedNoteIds?.size || 0) === 0}
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
               >
                 <Archive className="mr-2 h-4 w-4" />
-                Archive Selected
+                <span>Archive Selected</span>
               </Command.Item>
             </Command.Group>
           )}
 
-          <Command.Group heading="Settings">
+          <Command.Group heading="Settings" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
             <Command.Item
               onSelect={() => {
                 router.push("/settings");
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <SettingsIcon className="mr-2 h-4 w-4" />
-              Settings
+              <span>Settings</span>
             </Command.Item>
             <Command.Item
               onSelect={() => {
@@ -192,10 +196,11 @@ export function CommandPalette({ boards }: { boards: SimpleBoard[] }) {
                 window.dispatchEvent(event);
                 setOpen(false);
               }}
+              className="flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
             >
               <KeyboardIcon className="mr-2 h-4 w-4" />
-              Keyboard Shortcuts
-              <kbd className="ml-auto text-xs">?</kbd>
+              <span>Keyboard Shortcuts</span>
+              <kbd className="ml-auto px-1.5 py-0.5 bg-muted rounded text-xs font-mono">?</kbd>
             </Command.Item>
           </Command.Group>
         </Command.List>

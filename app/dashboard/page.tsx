@@ -29,6 +29,9 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FullPageLoader } from "@/components/ui/loader";
+import { CommandPalette } from "@/components/command-palette/CommandPalette";
+import { BoardActionsProvider } from "@/context/BoardActionsContext";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,7 +67,7 @@ const formSchema = z.object({
   description: z.string().optional(),
 });
 
-export default function Dashboard() {
+function DashboardContent() {
   const [boards, setBoards] = useState<DashboardBoard[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -314,6 +317,9 @@ export default function Dashboard() {
   const handleSignOut = async () => {
     await signOut();
   };
+
+  // Set up keyboard shortcuts
+  useKeyboardShortcuts();
 
   if (loading) {
     return <FullPageLoader message="Loading dashboard..." />;
@@ -672,6 +678,28 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <CommandPalette boards={boards.map(({ id, name }) => ({ id, name }))} />
     </div>
+  );
+}
+
+export default function Dashboard() {
+  // Empty board actions for dashboard (no board-specific functionality)
+  const emptyBoardActions = {
+    createChecklistNote: () => {},
+    createTextNote: () => {},
+    deleteSelectedNotes: () => {},
+    archiveSelectedNotes: () => {},
+    selectedNoteIds: new Set<string>(),
+    focusSearch: () => {},
+    clearSelection: () => {},
+    closeAllModals: () => {},
+    currentBoard: null,
+  };
+
+  return (
+    <BoardActionsProvider value={emptyBoardActions}>
+      <DashboardContent />
+    </BoardActionsProvider>
   );
 }
