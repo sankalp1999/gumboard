@@ -62,6 +62,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     description: string;
   }>({ open: false, title: "", description: "" });
   const pendingDeleteTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pendingLocalDeleteIdsRef = useRef<Set<string>>(new Set());
   const [boardSettingsDialog, setBoardSettingsDialog] = useState(false);
   const [boardSettings, setBoardSettings] = useState({
     sendSlackUpdates: true,
@@ -76,10 +77,11 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     pollingInterval: 4000,
     onUpdate: useCallback(
       (data: { notes: Note[] }) => {
+        const incoming = data.notes.filter((n) => !pendingLocalDeleteIdsRef.current.has(n.id));
         setNotes((prevNotes) => {
           const currentEditingId = editingNoteId;
           const prevMap = new Map(prevNotes.map((n) => [n.id, n]));
-          return data.notes.map((newNote) => {
+          return incoming.map((newNote) => {
             if (currentEditingId && newNote.id === currentEditingId) {
               return prevMap.get(newNote.id) ?? newNote;
             }
@@ -728,6 +730,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
 
     const targetBoardId = noteToDelete.board?.id ?? noteToDelete.boardId;
 
+    pendingLocalDeleteIdsRef.current.add(noteId);
     setNotes((prev) => prev.filter((n) => n.id !== noteId));
 
     const timeoutId = setTimeout(async () => {
@@ -736,6 +739,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           method: "DELETE",
         });
         if (!response.ok) {
+          pendingLocalDeleteIdsRef.current.delete(noteId);
           setNotes((prev) => [noteToDelete, ...prev]);
           const errorData = await response.json().catch(() => null);
           setErrorDialog({
@@ -746,6 +750,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         }
       } catch (error) {
         console.error("Error deleting note:", error);
+        pendingLocalDeleteIdsRef.current.delete(noteId);
         setNotes((prev) => [noteToDelete, ...prev]);
         setErrorDialog({
           open: true,
@@ -754,6 +759,8 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         });
       } finally {
         delete pendingDeleteTimeoutsRef.current[noteId];
+        // On success, keep it removed; clear guard after next poll tick automatically
+        // as the ID won't appear again.
       }
     }, 4000);
     pendingDeleteTimeoutsRef.current[noteId] = timeoutId;
@@ -767,6 +774,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
             clearTimeout(t);
             delete pendingDeleteTimeoutsRef.current[noteId];
           }
+          pendingLocalDeleteIdsRef.current.delete(noteId);
           setNotes((prev) => [noteToDelete, ...prev]);
         },
       },
