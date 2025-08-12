@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 const ACTIVITY_THRESHOLD = 30000;
 const MAX_BACKOFF_INTERVAL = 10000;
 const BACKOFF_MULTIPLIER = 2;
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_BASE = 1000;
 
 interface UsePollingOptions<T = unknown> {
   url: string;
@@ -24,12 +26,15 @@ export function usePolling<T = unknown>({
   onUpdate,
 }: UsePollingOptions<T>) {
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTabActiveRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastDataRef = useRef<string | null>(null);
   const lastActivityRef = useRef(Date.now());
   const etagRef = useRef<string | null>(null);
+  const retryCountRef = useRef(0);
+  const lastUrlRef = useRef(url);
 
   useEffect(() => {
     const updateActivity = () => {
@@ -66,9 +71,12 @@ export function usePolling<T = unknown>({
       const response = await fetch(url, {
         signal: abortControllerRef.current.signal,
         headers,
+        credentials: 'same-origin',
       });
 
       if (response.status === 304) {
+        retryCountRef.current = 0;
+        setError(null);
         return;
       }
 
@@ -86,10 +94,29 @@ export function usePolling<T = unknown>({
           setLastSync(new Date());
           onUpdate?.(data);
         }
+        
+        retryCountRef.current = 0;
+        setError(null);
+      } else if (response.status >= 400 && response.status < 500) {
+        setError(`Client error: ${response.status}`);
+        retryCountRef.current = 0;
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Polling error:', error);
+        if (retryCountRef.current < MAX_RETRY_ATTEMPTS) {
+          retryCountRef.current++;
+          const delay = RETRY_DELAY_BASE * Math.pow(2, retryCountRef.current - 1);
+          setTimeout(() => {
+            if (enabled && isTabActiveRef.current) {
+              fetchData();
+            }
+          }, delay);
+        } else {
+          setError(error.message);
+          console.error('Polling error after max retries:', error);
+        }
       }
     }
   }, [url, enabled, onUpdate]);
@@ -109,17 +136,39 @@ export function usePolling<T = unknown>({
   }, [fetchData, enabled]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (lastUrlRef.current !== url) {
+      etagRef.current = null;
+      lastDataRef.current = null;
+      retryCountRef.current = 0;
+      setError(null);
+      lastUrlRef.current = url;
+    }
+  }, [url]);
+
+  useEffect(() => {
+    if (!enabled) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      return;
+    }
 
     const scheduleNext = (delay: number) => {
       timeoutRef.current = setTimeout(() => {
-        if (isTabActiveRef.current) {
+        if (isTabActiveRef.current && enabled) {
           fetchData();
         }
         
-        const timeSinceActivity = Date.now() - lastActivityRef.current;
-        const nextInterval = getAdaptiveInterval(timeSinceActivity, interval);
-        scheduleNext(nextInterval);
+        if (enabled) {
+          const timeSinceActivity = Date.now() - lastActivityRef.current;
+          const nextInterval = getAdaptiveInterval(timeSinceActivity, interval);
+          scheduleNext(nextInterval);
+        }
       }, delay);
     };
     
@@ -140,5 +189,5 @@ export function usePolling<T = unknown>({
     };
   }, [enabled, interval, fetchData]);
 
-  return { lastSync };
+  return { lastSync, error };
 }

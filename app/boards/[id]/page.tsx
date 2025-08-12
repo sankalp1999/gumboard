@@ -70,7 +70,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  useBoardNotesPolling({
+  const { error: pollingError } = useBoardNotesPolling({
     boardId,
     enabled: !loading && !!boardId,
     pollingInterval: 4000, 
@@ -90,6 +90,12 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       });
     }, [editingNoteId]),
   });
+
+  useEffect(() => {
+    if (pollingError && pollingError.includes('Client error: 401')) {
+      router.push('/auth/signin');
+    }
+  }, [pollingError, router]);
 
   // Update URL with current filter state
   const updateURL = (

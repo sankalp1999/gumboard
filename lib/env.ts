@@ -7,7 +7,7 @@ const schema = z.object({
 
   // Emails
   EMAIL_FROM: z.string(),
-  AUTH_RESEND_KEY: z.string(),
+  AUTH_RESEND_KEY: z.string().optional(),
 
   // OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),
