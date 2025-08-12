@@ -597,7 +597,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         // For all notes view, create a virtual board object and fetch all notes
         [allBoardsResponse, notesResponse] = await Promise.all([
           fetch("/api/boards"),
-          fetch(`/api/boards/all-notes/notes`)
+          fetch(`/api/boards/all-notes/notes`),
         ]);
 
         setBoard({
@@ -608,7 +608,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       } else if (boardId === "archive") {
         [allBoardsResponse, notesResponse] = await Promise.all([
           fetch("/api/boards"),
-          fetch(`/api/boards/archive/notes`)
+          fetch(`/api/boards/archive/notes`),
         ]);
 
         // Set virtual board immediately
@@ -621,7 +621,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         [allBoardsResponse, boardResponse, notesResponse] = await Promise.all([
           fetch("/api/boards"),
           fetch(`/api/boards/${boardId}`),
-          fetch(`/api/boards/${boardId}/notes`)
+          fetch(`/api/boards/${boardId}/notes`),
         ]);
       }
 
@@ -634,9 +634,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         const { board } = await boardResponse.json();
         setBoard(board);
         setBoardSettings({
-          sendSlackUpdates:
-            (board as { sendSlackUpdates?: boolean })?.sendSlackUpdates ??
-            true,
+          sendSlackUpdates: (board as { sendSlackUpdates?: boolean })?.sendSlackUpdates ?? true,
         });
       }
 
