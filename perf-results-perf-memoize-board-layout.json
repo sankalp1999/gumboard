@@ -1,0 +1,31 @@
+{
+  "branch": "perf/memoize-board-layout",
+  "timestamp": "2025-08-12T10:02:07.286Z",
+  "boardId": "cme7jdwvg0001yzetc2d90m65",
+  "totals": {
+    "gridLayouts": 34,
+    "mobileLayouts": 4,
+    "noteHeightCalcs": 120,
+    "totalCalculations": 158
+  },
+  "searchTest": {
+    "gridLayouts": 2,
+    "mobileLayouts": 0,
+    "noteHeightCalcs": 0
+  },
+  "resizeTest": {
+    "gridLayouts": 4,
+    "mobileLayouts": 4,
+    "noteHeightCalcs": 0
+  },
+  "clearSearchTest": {
+    "gridLayouts": 2,
+    "mobileLayouts": 0,
+    "noteHeightCalcs": 10
+  },
+  "noteCrudTest": {
+    "gridLayouts": 20,
+    "mobileLayouts": 0,
+    "noteHeightCalcs": 100
+  }
+}
