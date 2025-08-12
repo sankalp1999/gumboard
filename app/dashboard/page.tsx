@@ -77,13 +77,19 @@ export default function Dashboard() {
   const [copiedBoardId, setCopiedBoardId] = useState<string | null>(null);
   const router = useRouter();
   
-  useBoardsListPolling({
+  const { error: boardsPollingError } = useBoardsListPolling({
     enabled: !loading,
     pollingInterval: 5000,
     onUpdate: useCallback((data: { boards: DashboardBoard[] }) => {
       setBoards(data.boards);
     }, []),
   });
+
+  useEffect(() => {
+    if (boardsPollingError && boardsPollingError.includes("Client error: 401")) {
+      router.push("/auth/signin");
+    }
+  }, [boardsPollingError, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
