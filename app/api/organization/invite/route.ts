@@ -90,14 +90,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send invite email (best-effort)
+    // Send invite email
     try {
-      if (env.AUTH_RESEND_KEY && env.EMAIL_FROM) {
-        await resend.emails.send({
-          from: env.EMAIL_FROM,
-          to: cleanEmail,
-          subject: `${session.user.name} invited you to join ${user.organization.name}`,
-          html: `
+      await resend.emails.send({
+        from: env.EMAIL_FROM,
+        to: cleanEmail,
+        subject: `${session.user.name} invited you to join ${user.organization.name}`,
+        html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>You're invited to join ${user.organization.name}!</h2>
             <p>${session.user.name} (${session.user.email}) has invited you to join their organization on Gumboard.</p>
@@ -111,8 +110,7 @@ export async function POST(request: NextRequest) {
             </p>
           </div>
         `,
-        });
-      }
+      });
     } catch (emailError) {
       console.error("Failed to send invite email:", emailError);
       // Don't fail the entire request if email sending fails
