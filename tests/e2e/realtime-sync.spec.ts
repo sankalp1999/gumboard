@@ -47,9 +47,9 @@ test.describe("Real-time Synchronization", () => {
     await page1.getByPlaceholder("Add new item...").fill("First item");
     await page1.getByPlaceholder("Add new item...").press("Enter");
 
-    await expect.poll(
-      () => store.all().find((n) => n.id === seeded.id)?.checklistItems?.length
-    ).toBe(1);
+    await expect
+      .poll(() => store.all().find((n) => n.id === seeded.id)?.checklistItems?.length)
+      .toBe(1);
 
     const itemId = store.all().find((n) => n.id === seeded.id)?.checklistItems?.[0]?.id as string;
 
@@ -58,11 +58,15 @@ test.describe("Real-time Synchronization", () => {
     const itemRow1 = page1.getByTestId(itemId);
     await itemRow1.getByRole("checkbox", { disabled: false }).click();
 
-    await expect.poll(async () => {
-      const row = page2.getByTestId(itemId);
-      const state = await row.getByRole("checkbox", { disabled: false }).getAttribute("data-state");
-      return state;
-    }).toBe("checked");
+    await expect
+      .poll(async () => {
+        const row = page2.getByTestId(itemId);
+        const state = await row
+          .getByRole("checkbox", { disabled: false })
+          .getAttribute("data-state");
+        return state;
+      })
+      .toBe("checked");
 
     await itemRow1.getByText("First item").click();
     const editInput = itemRow1.getByRole("textbox").first();
@@ -71,7 +75,9 @@ test.describe("Real-time Synchronization", () => {
 
     await page2.waitForTimeout(5000);
     const itemRow2 = page2.getByTestId(itemId);
-    await expect.poll(async () => await itemRow2.getByText("First item edited").count()).toBeGreaterThan(0);
+    await expect
+      .poll(async () => await itemRow2.getByText("First item edited").count())
+      .toBeGreaterThan(0);
 
     await context1.close();
     await context2.close();

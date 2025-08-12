@@ -20,12 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No organization found" }, { status: 403 });
     }
 
-    const [
-      latestNote,
-      noteCount,
-      latestChecklistItem,
-      checklistItemCount,
-    ] = await Promise.all([
+    const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
       db.note.findFirst({
         where: {
           deletedAt: null,
