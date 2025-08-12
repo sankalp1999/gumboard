@@ -1,13 +1,24 @@
-import { test, expect, Page, BrowserContext } from '@playwright/test'
-import { mockAuth, mockBoards, mockBoard, createSharedNotesStore, mockBoardNotes, createMockNote } from '../fixtures/api-mocks';
+import { test, expect, Page, BrowserContext } from "@playwright/test";
+import {
+  mockAuth,
+  mockBoards,
+  mockBoard,
+  createSharedNotesStore,
+  mockBoardNotes,
+  createMockNote,
+} from "../fixtures/api-mocks";
 
-test.describe('Real-time Synchronization', () => {
+test.describe("Real-time Synchronization", () => {
   const store = createSharedNotesStore();
   const setupMockRoutes = async (page: Page, userId: string) => {
-    await mockAuth(page, { id: userId, email: `${userId}@example.com`, name: userId === 'user-1' ? 'User One' : 'User Two' });
-    await mockBoards(page, [{ id: 'test-board', name: 'Test Board', description: 'A test board' }]);
-    await mockBoard(page, { id: 'test-board', name: 'Test Board', description: 'A test board' });
-    await mockBoardNotes(page, 'test-board', store);
+    await mockAuth(page, {
+      id: userId,
+      email: `${userId}@example.com`,
+      name: userId === "user-1" ? "User One" : "User Two",
+    });
+    await mockBoards(page, [{ id: "test-board", name: "Test Board", description: "A test board" }]);
+    await mockBoard(page, { id: "test-board", name: "Test Board", description: "A test board" });
+    await mockBoardNotes(page, "test-board", store);
   };
 
   test.beforeEach(async () => {
@@ -29,9 +40,9 @@ test.describe('Real-time Synchronization', () => {
 
     await page1.waitForTimeout(1000);
     await page2.waitForTimeout(1000);
-    
+
     expect(store.all().length).toBe(0);
-    
+
     await page1.evaluate(() => {
       fetch("/api/boards/test-board/notes", {
         method: "POST",
@@ -41,10 +52,10 @@ test.describe('Real-time Synchronization', () => {
     });
 
     await page1.waitForTimeout(1000);
-    
+
     expect(store.all().length).toBe(1);
-    expect(store.all()[0].content).toBe('Note from User 1');
-    
+    expect(store.all()[0].content).toBe("Note from User 1");
+
     await page2.waitForTimeout(5000);
 
     await page2.evaluate(() => {
@@ -56,18 +67,22 @@ test.describe('Real-time Synchronization', () => {
     });
 
     await page2.waitForTimeout(1000);
-    
+
     expect(store.all().length).toBe(2);
-    expect(store.all().find(n => n.content === 'Note from User 2')).toBeTruthy();
-    
+    expect(store.all().find((n) => n.content === "Note from User 2")).toBeTruthy();
+
     await context1.close();
     await context2.close();
   });
 
-  test('should preserve active edits during polling updates', async ({ browser }) => {
-    const existingNote = createMockNote({ content: 'Original content', userId: 'user-1', boardId: 'test-board' });
+  test("should preserve active edits during polling updates", async ({ browser }) => {
+    const existingNote = createMockNote({
+      content: "Original content",
+      userId: "user-1",
+      boardId: "test-board",
+    });
     store.add(existingNote);
-    
+
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
 
@@ -82,33 +97,43 @@ test.describe('Real-time Synchronization', () => {
 
     await page1.waitForTimeout(2000);
     await page2.waitForTimeout(2000);
-    
+
     await page2.evaluate((id) => {
-      fetch(`/api/boards/test-board/notes/${id}` , {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'User 2 updated content' })
+      fetch(`/api/boards/test-board/notes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "User 2 updated content" }),
       });
     }, existingNote.id);
-    
+
     await page2.waitForTimeout(1000);
-    
+
     // ensure store updated
-    expect(store.all().find(n => n.id === existingNote.id)?.content).toBe('User 2 updated content');
-    
-    await expect.poll(async () => await page1.locator('.note-background').count()).toBe(1);
-    await expect.poll(async () => await page2.locator('.note-background').count()).toBe(1);
-    
+    expect(store.all().find((n) => n.id === existingNote.id)?.content).toBe(
+      "User 2 updated content"
+    );
+
+    await expect.poll(async () => await page1.locator(".note-background").count()).toBe(1);
+    await expect.poll(async () => await page2.locator(".note-background").count()).toBe(1);
+
     await context1.close();
     await context2.close();
   });
 
-  test('should sync note deletions across sessions', async ({ browser }) => {
-    const note1 = createMockNote({ content: 'Note to keep', userId: 'user-1', boardId: 'test-board' });
-    const note2 = createMockNote({ content: 'Note to delete', userId: 'user-1', boardId: 'test-board' });
+  test("should sync note deletions across sessions", async ({ browser }) => {
+    const note1 = createMockNote({
+      content: "Note to keep",
+      userId: "user-1",
+      boardId: "test-board",
+    });
+    const note2 = createMockNote({
+      content: "Note to delete",
+      userId: "user-1",
+      boardId: "test-board",
+    });
     store.add(note1);
     store.add(note2);
-    
+
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
 
@@ -123,23 +148,23 @@ test.describe('Real-time Synchronization', () => {
 
     await page1.waitForTimeout(1000);
     await page2.waitForTimeout(1000);
-    
+
     expect(store.all().length).toBe(2);
-    
+
     await page1.evaluate((id) => {
-      fetch(`/api/boards/test-board/notes/${id}` , {
-        method: 'DELETE'
+      fetch(`/api/boards/test-board/notes/${id}`, {
+        method: "DELETE",
       });
     }, note2.id);
-    
+
     await page1.waitForTimeout(1000);
-    
+
     expect(store.all().length).toBe(1);
-    expect(store.all()[0].content).toBe('Note to keep');
-    
-    await expect.poll(async () => await page1.locator('.note-background').count()).toBe(1);
-    await expect.poll(async () => await page2.locator('.note-background').count()).toBe(1);
-    
+    expect(store.all()[0].content).toBe("Note to keep");
+
+    await expect.poll(async () => await page1.locator(".note-background").count()).toBe(1);
+    await expect.poll(async () => await page2.locator(".note-background").count()).toBe(1);
+
     await context1.close();
     await context2.close();
   });

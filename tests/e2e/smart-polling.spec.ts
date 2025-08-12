@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { mockAuth, mockBoards, mockBoard } from '../fixtures/api-mocks';
+import { test, expect } from "@playwright/test";
+import { mockAuth, mockBoards, mockBoard } from "../fixtures/api-mocks";
 
 test.describe("Smart Polling", () => {
   let requestCount = 0;
@@ -23,10 +23,10 @@ test.describe("Smart Polling", () => {
 
   test.beforeEach(async ({ page }) => {
     requestCount = 0;
-    etagValue = 'initial-etag';
-    await mockAuth(page, { id: 'test-user', email: 'test@example.com', name: 'Test User' });
-    await mockBoards(page, [{ id: 'test-board', name: 'Test Board', description: 'A test board' }]);
-    await mockBoard(page, { id: 'test-board', name: 'Test Board', description: 'A test board' });
+    etagValue = "initial-etag";
+    await mockAuth(page, { id: "test-user", email: "test@example.com", name: "Test User" });
+    await mockBoards(page, [{ id: "test-board", name: "Test Board", description: "A test board" }]);
+    await mockBoard(page, { id: "test-board", name: "Test Board", description: "A test board" });
   });
 
   test("should use ETag caching effectively", async ({ page }) => {
