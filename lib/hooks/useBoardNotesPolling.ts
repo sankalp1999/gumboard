@@ -1,4 +1,4 @@
-import { usePolling } from './usePolling';
+import { usePolling } from "./usePolling";
 
 interface UseBoardNotesPollingOptions<T = { notes: unknown[] }> {
   boardId: string | null;
@@ -13,9 +13,8 @@ export function useBoardNotesPolling<T = { notes: unknown[] }>({
   pollingInterval = 4000,
   onUpdate,
 }: UseBoardNotesPollingOptions<T>) {
-  const url = boardId === 'all-notes' 
-    ? '/api/boards/all-notes/notes'
-    : `/api/boards/${boardId}/notes`;
+  const url =
+    boardId === "all-notes" ? "/api/boards/all-notes/notes" : `/api/boards/${boardId}/notes`;
 
   return usePolling<T>({
     url,

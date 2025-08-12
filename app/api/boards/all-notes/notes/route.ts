@@ -25,22 +25,22 @@ export async function GET(request: NextRequest) {
         where: {
           deletedAt: null,
           archivedAt: null,
-          board: { organizationId: user.organizationId }
+          board: { organizationId: user.organizationId },
         },
-        orderBy: { updatedAt: 'desc' },
-        select: { updatedAt: true }
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
       }),
       db.note.count({
         where: {
           deletedAt: null,
           archivedAt: null,
-          board: { organizationId: user.organizationId }
-        }
-      })
+          board: { organizationId: user.organizationId },
+        },
+      }),
     ]);
 
-    const etag = `${noteCount}-${latestNote?.updatedAt?.toISOString() || 'empty'}`;
-    
+    const etag = `${noteCount}-${latestNote?.updatedAt?.toISOString() || "empty"}`;
+
     const etagMatch = checkEtagMatch(request, etag);
     if (etagMatch) return etagMatch;
 

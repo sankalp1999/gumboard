@@ -14,47 +14,47 @@ test.describe('Real-time Synchronization', () => {
     store.setAll([]);
   });
 
-  test('should sync note creation between multiple users', async ({ browser }) => {
+  test("should sync note creation between multiple users", async ({ browser }) => {
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
-    
+
     const page1 = await context1.newPage();
     const page2 = await context2.newPage();
-    
-    await setupMockRoutes(page1, 'user-1');
-    await setupMockRoutes(page2, 'user-2');
-    
-    await page1.goto('/boards/test-board');
-    await page2.goto('/boards/test-board');
-    
+
+    await setupMockRoutes(page1, "user-1");
+    await setupMockRoutes(page2, "user-2");
+
+    await page1.goto("/boards/test-board");
+    await page2.goto("/boards/test-board");
+
     await page1.waitForTimeout(1000);
     await page2.waitForTimeout(1000);
     
     expect(store.all().length).toBe(0);
     
     await page1.evaluate(() => {
-      fetch('/api/boards/test-board/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'Note from User 1' })
+      fetch("/api/boards/test-board/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "Note from User 1" }),
       });
     });
-    
+
     await page1.waitForTimeout(1000);
     
     expect(store.all().length).toBe(1);
     expect(store.all()[0].content).toBe('Note from User 1');
     
     await page2.waitForTimeout(5000);
-    
+
     await page2.evaluate(() => {
-      fetch('/api/boards/test-board/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: 'Note from User 2' })
+      fetch("/api/boards/test-board/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "Note from User 2" }),
       });
     });
-    
+
     await page2.waitForTimeout(1000);
     
     expect(store.all().length).toBe(2);
@@ -70,16 +70,16 @@ test.describe('Real-time Synchronization', () => {
     
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
-    
+
     const page1 = await context1.newPage();
     const page2 = await context2.newPage();
-    
-    await setupMockRoutes(page1, 'user-1');
-    await setupMockRoutes(page2, 'user-2');
-    
-    await page1.goto('/boards/test-board');
-    await page2.goto('/boards/test-board');
-    
+
+    await setupMockRoutes(page1, "user-1");
+    await setupMockRoutes(page2, "user-2");
+
+    await page1.goto("/boards/test-board");
+    await page2.goto("/boards/test-board");
+
     await page1.waitForTimeout(2000);
     await page2.waitForTimeout(2000);
     
@@ -111,16 +111,16 @@ test.describe('Real-time Synchronization', () => {
     
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
-    
+
     const page1 = await context1.newPage();
     const page2 = await context2.newPage();
-    
-    await setupMockRoutes(page1, 'user-1');
-    await setupMockRoutes(page2, 'user-2');
-    
-    await page1.goto('/boards/test-board');
-    await page2.goto('/boards/test-board');
-    
+
+    await setupMockRoutes(page1, "user-1");
+    await setupMockRoutes(page2, "user-2");
+
+    await page1.goto("/boards/test-board");
+    await page2.goto("/boards/test-board");
+
     await page1.waitForTimeout(1000);
     await page2.waitForTimeout(1000);
     

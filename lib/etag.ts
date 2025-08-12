@@ -1,39 +1,35 @@
-import { NextRequest, NextResponse } from "next/server"
-import crypto from "crypto"
+import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 
 export function checkEtagMatch(
   request: NextRequest,
   etag: string,
   additionalHeaders?: HeadersInit
 ): Response | null {
-  const clientEtag = request.headers.get('if-none-match')
+  const clientEtag = request.headers.get("if-none-match");
   if (clientEtag === etag) {
-    return new Response(null, { 
+    return new Response(null, {
       status: 304,
-      headers: { 
-        'ETag': etag,
-        'Cache-Control': 'no-cache',
-        'Vary': 'If-None-Match',
-        ...additionalHeaders 
-      }
-    })
+      headers: {
+        ETag: etag,
+        "Cache-Control": "no-cache",
+        Vary: "If-None-Match",
+        ...additionalHeaders,
+      },
+    });
   }
-  return null
+  return null;
 }
 
-export function createEtagResponse(
-  data: unknown,
-  etag: string,
-  additionalHeaders?: HeadersInit
-) {
-  return NextResponse.json(data, { 
-    headers: { 
-      'ETag': etag,
-      'Cache-Control': 'no-cache',
-      'Vary': 'If-None-Match',
-      ...additionalHeaders 
-    } 
-  })
+export function createEtagResponse(data: unknown, etag: string, additionalHeaders?: HeadersInit) {
+  return NextResponse.json(data, {
+    headers: {
+      ETag: etag,
+      "Cache-Control": "no-cache",
+      Vary: "If-None-Match",
+      ...additionalHeaders,
+    },
+  });
 }
 
 export function handleEtagResponse(
@@ -41,13 +37,10 @@ export function handleEtagResponse(
   data: unknown,
   additionalHeaders?: HeadersInit
 ) {
-  const etag = crypto
-    .createHash('md5')
-    .update(JSON.stringify(data))
-    .digest('hex')
-  
-  const match = checkEtagMatch(request, etag, additionalHeaders)
-  if (match) return match
-  
-  return createEtagResponse(data, etag, additionalHeaders)
+  const etag = crypto.createHash("md5").update(JSON.stringify(data)).digest("hex");
+
+  const match = checkEtagMatch(request, etag, additionalHeaders);
+  if (match) return match;
+
+  return createEtagResponse(data, etag, additionalHeaders);
 }
