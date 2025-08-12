@@ -76,15 +76,12 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     pollingInterval: 4000, 
     onUpdate: useCallback((data: { notes: Note[] }) => {
       setNotes((prevNotes) => {
-        const currentEditingNoteId = editingNoteId;
-        
+        const currentEditingId = editingNoteId;
+        const prevMap = new Map(prevNotes.map(n => [n.id, n]));
         return data.notes.map(newNote => {
-          const prevNote = prevNotes.find(n => n.id === newNote.id);
-          
-          if (newNote.id === currentEditingNoteId && prevNote) {
-            return prevNote; 
+          if (currentEditingId && newNote.id === currentEditingId) {
+            return prevMap.get(newNote.id) ?? newNote;
           }
-          
           return newNote;
         });
       });
@@ -1126,6 +1123,8 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
               onArchive={boardId !== "archive" ? handleArchiveNote : undefined}
               onUnarchive={boardId === "archive" ? handleUnarchiveNote : undefined}
               showBoardName={boardId === "all-notes" || boardId === "archive"}
+              onStartNoteEdit={() => setEditingNoteId(note.id)}
+              onStopNoteEdit={() => setEditingNoteId(null)}
               className="note-background"
               style={{
                 position: "absolute",

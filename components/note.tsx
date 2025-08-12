@@ -69,6 +69,8 @@ interface NoteProps {
   showBoardName?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  onStartNoteEdit?: (noteId: string) => void;
+  onStopNoteEdit?: () => void;
 }
 
 export function Note({
@@ -84,6 +86,8 @@ export function Note({
   className,
   syncDB = true,
   style,
+  onStartNoteEdit,
+  onStopNoteEdit,
 }: NoteProps) {
   const [isEditing, setIsEditing] = useState(false);
   const { resolvedTheme } = useTheme();
@@ -378,11 +382,13 @@ export function Note({
     if (canEdit) {
       setIsEditing(true);
       setEditContent(note.content);
+      onStartNoteEdit?.(note.id);
     }
   };
 
   const handleStopEdit = () => {
     setIsEditing(false);
+    onStopNoteEdit?.();
     if (onUpdate && editContent !== note.content) {
       onUpdate({ ...note, content: editContent });
     }
