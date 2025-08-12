@@ -65,11 +65,9 @@ test.describe("Real-time Synchronization", () => {
     }).toBe("checked");
 
     await itemRow1.getByText("First item").click();
-    const editInput = itemRow1
-      .locator('input[type="text"]').filter({ hasValue: "First item" })
-      .first();
+    const editInput = itemRow1.getByRole("textbox").first();
     await editInput.fill("First item edited");
-    await editInput.press("Enter");
+    await editInput.blur();
 
     await page2.waitForTimeout(5000);
     const itemRow2 = page2.getByTestId(itemId);
