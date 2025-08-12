@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { BetaBadge } from "@/components/ui/beta-badge";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Grid3x3, Copy, Edit3, Archive } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FullPageLoader } from "@/components/ui/loader";
@@ -42,6 +42,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ProfileDropdown } from "@/components/profile-dropdown";
+import { useBoardsListPolling } from "@/lib/hooks/useBoardsListPolling";
 
 // Dashboard-specific extended types
 export type DashboardBoard = Board & {
@@ -75,6 +76,14 @@ export default function Dashboard() {
   }>({ open: false, title: "", description: "" });
   const [copiedBoardId, setCopiedBoardId] = useState<string | null>(null);
   const router = useRouter();
+  
+  useBoardsListPolling({
+    enabled: !loading,
+    pollingInterval: 5000,
+    onUpdate: useCallback((data: { boards: DashboardBoard[] }) => {
+      setBoards(data.boards);
+    }, []),
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

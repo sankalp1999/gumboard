@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,7 @@ import type { Note, Board, User } from "@/components/note";
 import { useTheme } from "next-themes";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { toast } from "sonner";
+import { useBoardNotesPolling } from "@/lib/hooks/useBoardNotesPolling";
 
 export default function BoardPage({ params }: { params: Promise<{ id: string }> }) {
   const [board, setBoard] = useState<Board | null>(null);
@@ -53,6 +54,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   });
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [addingChecklistItem, setAddingChecklistItem] = useState<string | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   // Per-item edit and animations are handled inside Note component now
   const [errorDialog, setErrorDialog] = useState<{
     open: boolean;
@@ -67,6 +69,27 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const boardRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  
+  useBoardNotesPolling({
+    boardId,
+    enabled: !loading && !!boardId,
+    pollingInterval: 4000, 
+    onUpdate: useCallback((data: { notes: Note[] }) => {
+      setNotes((prevNotes) => {
+        const currentEditingNoteId = editingNoteId;
+        
+        return data.notes.map(newNote => {
+          const prevNote = prevNotes.find(n => n.id === newNote.id);
+          
+          if (newNote.id === currentEditingNoteId && prevNote) {
+            return prevNote; 
+          }
+          
+          return newNote;
+        });
+      });
+    }, [editingNoteId]),
+  });
 
   // Update URL with current filter state
   const updateURL = (
