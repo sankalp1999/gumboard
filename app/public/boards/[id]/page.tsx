@@ -77,52 +77,51 @@ export default function PublicBoardPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  const calculateNoteHeight = useCallback((
-    note: Note,
-    noteWidth?: number,
-    notePadding?: number
-  ) => {
-    const config = getResponsiveConfig();
-    const actualNotePadding = notePadding || config.notePadding;
-    const actualNoteWidth = noteWidth || config.noteWidth;
+  const calculateNoteHeight = useCallback(
+    (note: Note, noteWidth?: number, notePadding?: number) => {
+      const config = getResponsiveConfig();
+      const actualNotePadding = notePadding || config.notePadding;
+      const actualNoteWidth = noteWidth || config.noteWidth;
 
-    const headerHeight = 76;
-    const paddingHeight = actualNotePadding * 2;
-    const minContentHeight = 84;
+      const headerHeight = 76;
+      const paddingHeight = actualNotePadding * 2;
+      const minContentHeight = 84;
 
-    if (note.checklistItems) {
-      const itemHeight = 32;
-      const itemSpacing = 8;
-      const checklistItemsCount = note.checklistItems.length;
+      if (note.checklistItems) {
+        const itemHeight = 32;
+        const itemSpacing = 8;
+        const checklistItemsCount = note.checklistItems.length;
 
-      const checklistHeight =
-        checklistItemsCount * itemHeight + (checklistItemsCount - 1) * itemSpacing;
-      const totalChecklistHeight = Math.max(minContentHeight, checklistHeight);
+        const checklistHeight =
+          checklistItemsCount * itemHeight + (checklistItemsCount - 1) * itemSpacing;
+        const totalChecklistHeight = Math.max(minContentHeight, checklistHeight);
 
-      return headerHeight + paddingHeight + totalChecklistHeight + 40;
-    } else {
-      const lines = note.content.split("\n");
-      const avgCharWidth = 9;
-      const contentWidth = actualNoteWidth - actualNotePadding * 2 - 16;
-      const charsPerLine = Math.floor(contentWidth / avgCharWidth);
+        return headerHeight + paddingHeight + totalChecklistHeight + 40;
+      } else {
+        const lines = note.content.split("\n");
+        const avgCharWidth = 9;
+        const contentWidth = actualNoteWidth - actualNotePadding * 2 - 16;
+        const charsPerLine = Math.floor(contentWidth / avgCharWidth);
 
-      let totalLines = 0;
-      lines.forEach((line) => {
-        if (line.length === 0) {
-          totalLines += 1;
-        } else {
-          const wrappedLines = Math.ceil(line.length / charsPerLine);
-          totalLines += Math.max(1, wrappedLines);
-        }
-      });
+        let totalLines = 0;
+        lines.forEach((line) => {
+          if (line.length === 0) {
+            totalLines += 1;
+          } else {
+            const wrappedLines = Math.ceil(line.length / charsPerLine);
+            totalLines += Math.max(1, wrappedLines);
+          }
+        });
 
-      totalLines = Math.max(3, totalLines);
-      const lineHeight = 28;
-      const contentHeight = totalLines * lineHeight;
+        totalLines = Math.max(3, totalLines);
+        const lineHeight = 28;
+        const contentHeight = totalLines * lineHeight;
 
-      return headerHeight + paddingHeight + Math.max(minContentHeight, contentHeight);
-    }
-  }, []);
+        return headerHeight + paddingHeight + Math.max(minContentHeight, contentHeight);
+      }
+    },
+    []
+  );
 
   const getUniqueAuthors = (notes: Note[]) => {
     const authorsMap = new Map<string, { id: string; name: string; email: string }>();
@@ -189,103 +188,101 @@ export default function PublicBoardPage({ params }: { params: Promise<{ id: stri
     return filteredNotes;
   };
 
-  const calculateGridLayout = useCallback((notesToLayout: Note[]) => {
-    if (typeof window === "undefined") return [];
+  const calculateGridLayout = useCallback(
+    (notesToLayout: Note[]) => {
+      if (typeof window === "undefined") return [];
 
-    const config = getResponsiveConfig();
-    const containerWidth = window.innerWidth - config.containerPadding * 2;
-    const noteWidthWithGap = config.noteWidth + config.gridGap;
-    const columnsCount = Math.floor((containerWidth + config.gridGap) / noteWidthWithGap);
-    const actualColumnsCount = Math.max(1, columnsCount);
+      const config = getResponsiveConfig();
+      const containerWidth = window.innerWidth - config.containerPadding * 2;
+      const noteWidthWithGap = config.noteWidth + config.gridGap;
+      const columnsCount = Math.floor((containerWidth + config.gridGap) / noteWidthWithGap);
+      const actualColumnsCount = Math.max(1, columnsCount);
 
-    const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
-    const calculatedNoteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
-    const minWidth = config.noteWidth - 40;
-    const maxWidth = config.noteWidth + 80;
-    const adjustedNoteWidth = Math.max(minWidth, Math.min(maxWidth, calculatedNoteWidth));
+      const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
+      const calculatedNoteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
+      const minWidth = config.noteWidth - 40;
+      const maxWidth = config.noteWidth + 80;
+      const adjustedNoteWidth = Math.max(minWidth, Math.min(maxWidth, calculatedNoteWidth));
 
-    const offsetX = config.containerPadding;
-    const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
+      const offsetX = config.containerPadding;
+      const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
 
-    return notesToLayout.map((note) => {
-      const noteHeight = calculateNoteHeight(
-        note,
-        adjustedNoteWidth,
-        config.notePadding
-      );
+      return notesToLayout.map((note) => {
+        const noteHeight = calculateNoteHeight(note, adjustedNoteWidth, config.notePadding);
 
-      let bestColumn = 0;
-      let minBottom = columnBottoms[0];
+        let bestColumn = 0;
+        let minBottom = columnBottoms[0];
 
-      for (let col = 1; col < actualColumnsCount; col++) {
-        if (columnBottoms[col] < minBottom) {
-          minBottom = columnBottoms[col];
-          bestColumn = col;
+        for (let col = 1; col < actualColumnsCount; col++) {
+          if (columnBottoms[col] < minBottom) {
+            minBottom = columnBottoms[col];
+            bestColumn = col;
+          }
         }
-      }
 
-      const x = offsetX + bestColumn * (adjustedNoteWidth + config.gridGap);
-      const y = columnBottoms[bestColumn];
+        const x = offsetX + bestColumn * (adjustedNoteWidth + config.gridGap);
+        const y = columnBottoms[bestColumn];
 
-      columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
+        columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
 
-      return {
-        ...note,
-        x,
-        y,
-        width: adjustedNoteWidth,
-        height: noteHeight,
-      };
-    });
-  }, [calculateNoteHeight]);
+        return {
+          ...note,
+          x,
+          y,
+          width: adjustedNoteWidth,
+          height: noteHeight,
+        };
+      });
+    },
+    [calculateNoteHeight]
+  );
 
-  const calculateMobileLayout = useCallback((notesToLayout: Note[]) => {
-    if (typeof window === "undefined") return [];
+  const calculateMobileLayout = useCallback(
+    (notesToLayout: Note[]) => {
+      if (typeof window === "undefined") return [];
 
-    const config = getResponsiveConfig();
-    const containerWidth = window.innerWidth - config.containerPadding * 2;
-    const minNoteWidth = config.noteWidth - 20;
-    const columnsCount = Math.floor(
-      (containerWidth + config.gridGap) / (minNoteWidth + config.gridGap)
-    );
-    const actualColumnsCount = Math.max(1, columnsCount);
-
-    const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
-    const noteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
-
-    const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
-
-    return notesToLayout.map((note) => {
-      const noteHeight = calculateNoteHeight(
-        note,
-        noteWidth,
-        config.notePadding
+      const config = getResponsiveConfig();
+      const containerWidth = window.innerWidth - config.containerPadding * 2;
+      const minNoteWidth = config.noteWidth - 20;
+      const columnsCount = Math.floor(
+        (containerWidth + config.gridGap) / (minNoteWidth + config.gridGap)
       );
+      const actualColumnsCount = Math.max(1, columnsCount);
 
-      let bestColumn = 0;
-      let minBottom = columnBottoms[0];
+      const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
+      const noteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
 
-      for (let col = 1; col < actualColumnsCount; col++) {
-        if (columnBottoms[col] < minBottom) {
-          minBottom = columnBottoms[col];
-          bestColumn = col;
+      const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
+
+      return notesToLayout.map((note) => {
+        const noteHeight = calculateNoteHeight(note, noteWidth, config.notePadding);
+
+        let bestColumn = 0;
+        let minBottom = columnBottoms[0];
+
+        for (let col = 1; col < actualColumnsCount; col++) {
+          if (columnBottoms[col] < minBottom) {
+            minBottom = columnBottoms[col];
+            bestColumn = col;
+          }
         }
-      }
 
-      const x = config.containerPadding + bestColumn * (noteWidth + config.gridGap);
-      const y = columnBottoms[bestColumn];
+        const x = config.containerPadding + bestColumn * (noteWidth + config.gridGap);
+        const y = columnBottoms[bestColumn];
 
-      columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
+        columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
 
-      return {
-        ...note,
-        x,
-        y,
-        width: noteWidth,
-        height: noteHeight,
-      };
-    });
-  }, [calculateNoteHeight]);
+        return {
+          ...note,
+          x,
+          y,
+          width: noteWidth,
+          height: noteHeight,
+        };
+      });
+    },
+    [calculateNoteHeight]
+  );
 
   useEffect(() => {
     const initializeParams = async () => {
@@ -352,7 +349,6 @@ export default function PublicBoardPage({ params }: { params: Promise<{ id: stri
       clearTimeout(resizeTimeout);
     };
   }, []);
-
 
   const uniqueAuthors = useMemo(() => getUniqueAuthors(notes), [notes]);
 

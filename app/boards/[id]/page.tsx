@@ -71,37 +71,40 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const searchParams = useSearchParams();
 
   // Update URL with current filter state
-  const updateURL = useCallback((
-    newSearchTerm?: string,
-    newDateRange?: { startDate: Date | null; endDate: Date | null },
-    newAuthor?: string | null
-  ) => {
-    const params = new URLSearchParams();
+  const updateURL = useCallback(
+    (
+      newSearchTerm?: string,
+      newDateRange?: { startDate: Date | null; endDate: Date | null },
+      newAuthor?: string | null
+    ) => {
+      const params = new URLSearchParams();
 
-    const currentSearchTerm = newSearchTerm !== undefined ? newSearchTerm : searchTerm;
-    const currentDateRange = newDateRange !== undefined ? newDateRange : dateRange;
-    const currentAuthor = newAuthor !== undefined ? newAuthor : selectedAuthor;
+      const currentSearchTerm = newSearchTerm !== undefined ? newSearchTerm : searchTerm;
+      const currentDateRange = newDateRange !== undefined ? newDateRange : dateRange;
+      const currentAuthor = newAuthor !== undefined ? newAuthor : selectedAuthor;
 
-    if (currentSearchTerm) {
-      params.set("search", currentSearchTerm);
-    }
+      if (currentSearchTerm) {
+        params.set("search", currentSearchTerm);
+      }
 
-    if (currentDateRange.startDate) {
-      params.set("startDate", currentDateRange.startDate.toISOString().split("T")[0]);
-    }
+      if (currentDateRange.startDate) {
+        params.set("startDate", currentDateRange.startDate.toISOString().split("T")[0]);
+      }
 
-    if (currentDateRange.endDate) {
-      params.set("endDate", currentDateRange.endDate.toISOString().split("T")[0]);
-    }
+      if (currentDateRange.endDate) {
+        params.set("endDate", currentDateRange.endDate.toISOString().split("T")[0]);
+      }
 
-    if (currentAuthor) {
-      params.set("author", currentAuthor);
-    }
+      if (currentAuthor) {
+        params.set("author", currentAuthor);
+      }
 
-    const queryString = params.toString();
-    const newURL = queryString ? `?${queryString}` : window.location.pathname;
-    router.replace(newURL, { scroll: false });
-  }, [searchTerm, dateRange, selectedAuthor, router]);
+      const queryString = params.toString();
+      const newURL = queryString ? `?${queryString}` : window.location.pathname;
+      router.replace(newURL, { scroll: false });
+    },
+    [searchTerm, dateRange, selectedAuthor, router]
+  );
 
   // Initialize filters from URL parameters
   const initializeFiltersFromURL = () => {
@@ -194,177 +197,174 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   };
 
   // Helper function to calculate note height based on content
-  const calculateNoteHeight = useCallback((
-    note: Note,
-    noteWidth?: number,
-    notePadding?: number
-  ) => {
-    const config = getResponsiveConfig();
-    const actualNotePadding = notePadding || config.notePadding;
-    const actualNoteWidth = noteWidth || config.noteWidth;
+  const calculateNoteHeight = useCallback(
+    (note: Note, noteWidth?: number, notePadding?: number) => {
+      const config = getResponsiveConfig();
+      const actualNotePadding = notePadding || config.notePadding;
+      const actualNoteWidth = noteWidth || config.noteWidth;
 
-    const headerHeight = 60; // User info header + margins
-    const paddingHeight = actualNotePadding * 2; // Top and bottom padding
-    const minContentHeight = 60; // Minimum content area
+      const headerHeight = 60; // User info header + margins
+      const paddingHeight = actualNotePadding * 2; // Top and bottom padding
+      const minContentHeight = 60; // Minimum content area
 
-    if (note.checklistItems) {
-      // For checklist items, calculate height based on number of items
-      const itemHeight = 28; // Each checklist item is about 28px tall (more accurate)
-      const itemSpacing = 4; // Space between items (space-y-1 = 4px)
-      const checklistItemsCount = note.checklistItems.length;
-      const addingItemHeight = addingChecklistItem === note.id ? 32 : 0; // Add height for input field
-      const addTaskButtonHeight = 36; // Height for the "Add task" button including margin
+      if (note.checklistItems) {
+        // For checklist items, calculate height based on number of items
+        const itemHeight = 28; // Each checklist item is about 28px tall (more accurate)
+        const itemSpacing = 4; // Space between items (space-y-1 = 4px)
+        const checklistItemsCount = note.checklistItems.length;
+        const addingItemHeight = addingChecklistItem === note.id ? 32 : 0; // Add height for input field
+        const addTaskButtonHeight = 36; // Height for the "Add task" button including margin
 
-      const checklistHeight =
-        checklistItemsCount * itemHeight +
-        (checklistItemsCount > 0 ? (checklistItemsCount - 1) * itemSpacing : 0) +
-        addingItemHeight;
-      const totalChecklistHeight = Math.max(minContentHeight, checklistHeight);
+        const checklistHeight =
+          checklistItemsCount * itemHeight +
+          (checklistItemsCount > 0 ? (checklistItemsCount - 1) * itemSpacing : 0) +
+          addingItemHeight;
+        const totalChecklistHeight = Math.max(minContentHeight, checklistHeight);
 
-      return headerHeight + paddingHeight + totalChecklistHeight + addTaskButtonHeight;
-    } else {
-      // Original logic for regular notes
-      const lines = note.content.split("\n");
+        return headerHeight + paddingHeight + totalChecklistHeight + addTaskButtonHeight;
+      } else {
+        // Original logic for regular notes
+        const lines = note.content.split("\n");
 
-      // Estimate character width and calculate text wrapping
-      const avgCharWidth = 9; // Average character width in pixels
-      const contentWidth = actualNoteWidth - actualNotePadding * 2 - 16; // Note width minus padding and margins
-      const charsPerLine = Math.floor(contentWidth / avgCharWidth);
+        // Estimate character width and calculate text wrapping
+        const avgCharWidth = 9; // Average character width in pixels
+        const contentWidth = actualNoteWidth - actualNotePadding * 2 - 16; // Note width minus padding and margins
+        const charsPerLine = Math.floor(contentWidth / avgCharWidth);
 
-      // Calculate total lines including wrapped text
-      let totalLines = 0;
-      lines.forEach((line) => {
-        if (line.length === 0) {
-          totalLines += 1; // Empty line
-        } else {
-          const wrappedLines = Math.ceil(line.length / charsPerLine);
-          totalLines += Math.max(1, wrappedLines);
-        }
-      });
+        // Calculate total lines including wrapped text
+        let totalLines = 0;
+        lines.forEach((line) => {
+          if (line.length === 0) {
+            totalLines += 1; // Empty line
+          } else {
+            const wrappedLines = Math.ceil(line.length / charsPerLine);
+            totalLines += Math.max(1, wrappedLines);
+          }
+        });
 
-      // Ensure minimum content
-      totalLines = Math.max(3, totalLines);
+        // Ensure minimum content
+        totalLines = Math.max(3, totalLines);
 
-      // Calculate based on actual text content with wrapping
-      const lineHeight = 28; // Line height for readability (leading-7)
-      const contentHeight = totalLines * lineHeight;
+        // Calculate based on actual text content with wrapping
+        const lineHeight = 28; // Line height for readability (leading-7)
+        const contentHeight = totalLines * lineHeight;
 
-      return headerHeight + paddingHeight + Math.max(minContentHeight, contentHeight);
-    }
-  }, [addingChecklistItem]);
+        return headerHeight + paddingHeight + Math.max(minContentHeight, contentHeight);
+      }
+    },
+    [addingChecklistItem]
+  );
 
   // Helper function to calculate bin-packed layout for desktop
-  const calculateGridLayout = useCallback((notesToLayout: Note[]) => {
-    if (typeof window === "undefined") return [];
+  const calculateGridLayout = useCallback(
+    (notesToLayout: Note[]) => {
+      if (typeof window === "undefined") return [];
 
-    const config = getResponsiveConfig();
-    const containerWidth = window.innerWidth - config.containerPadding * 2;
-    const noteWidthWithGap = config.noteWidth + config.gridGap;
-    const columnsCount = Math.floor((containerWidth + config.gridGap) / noteWidthWithGap);
-    const actualColumnsCount = Math.max(1, columnsCount);
+      const config = getResponsiveConfig();
+      const containerWidth = window.innerWidth - config.containerPadding * 2;
+      const noteWidthWithGap = config.noteWidth + config.gridGap;
+      const columnsCount = Math.floor((containerWidth + config.gridGap) / noteWidthWithGap);
+      const actualColumnsCount = Math.max(1, columnsCount);
 
-    // Calculate the actual available width and adjust note width to fill better
-    const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
-    const calculatedNoteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
-    // Ensure notes don't get too narrow or too wide based on screen size
-    const minWidth = config.noteWidth - 40;
-    const maxWidth = config.noteWidth + 80;
-    const adjustedNoteWidth = Math.max(minWidth, Math.min(maxWidth, calculatedNoteWidth));
+      // Calculate the actual available width and adjust note width to fill better
+      const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
+      const calculatedNoteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
+      // Ensure notes don't get too narrow or too wide based on screen size
+      const minWidth = config.noteWidth - 40;
+      const maxWidth = config.noteWidth + 80;
+      const adjustedNoteWidth = Math.max(minWidth, Math.min(maxWidth, calculatedNoteWidth));
 
-    // Use full width with minimal left offset
-    const offsetX = config.containerPadding;
+      // Use full width with minimal left offset
+      const offsetX = config.containerPadding;
 
-    // Bin-packing algorithm: track the bottom Y position of each column
-    const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
+      // Bin-packing algorithm: track the bottom Y position of each column
+      const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
 
-    return notesToLayout.map((note) => {
-      const noteHeight = calculateNoteHeight(
-        note,
-        adjustedNoteWidth,
-        config.notePadding
-      );
+      return notesToLayout.map((note) => {
+        const noteHeight = calculateNoteHeight(note, adjustedNoteWidth, config.notePadding);
 
-      // Find the column with the lowest bottom position
-      let bestColumn = 0;
-      let minBottom = columnBottoms[0];
+        // Find the column with the lowest bottom position
+        let bestColumn = 0;
+        let minBottom = columnBottoms[0];
 
-      for (let col = 1; col < actualColumnsCount; col++) {
-        if (columnBottoms[col] < minBottom) {
-          minBottom = columnBottoms[col];
-          bestColumn = col;
+        for (let col = 1; col < actualColumnsCount; col++) {
+          if (columnBottoms[col] < minBottom) {
+            minBottom = columnBottoms[col];
+            bestColumn = col;
+          }
         }
-      }
 
-      // Place the note in the best column
-      const x = offsetX + bestColumn * (adjustedNoteWidth + config.gridGap);
-      const y = columnBottoms[bestColumn];
+        // Place the note in the best column
+        const x = offsetX + bestColumn * (adjustedNoteWidth + config.gridGap);
+        const y = columnBottoms[bestColumn];
 
-      // Update the column bottom position
-      columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
+        // Update the column bottom position
+        columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
 
-      return {
-        ...note,
-        x,
-        y,
-        width: adjustedNoteWidth,
-        height: noteHeight,
-      };
-    });
-  }, [calculateNoteHeight]);
+        return {
+          ...note,
+          x,
+          y,
+          width: adjustedNoteWidth,
+          height: noteHeight,
+        };
+      });
+    },
+    [calculateNoteHeight]
+  );
 
   // Helper function to calculate mobile layout (optimized single/double column)
-  const calculateMobileLayout = useCallback((notesToLayout: Note[]) => {
-    if (typeof window === "undefined") return [];
+  const calculateMobileLayout = useCallback(
+    (notesToLayout: Note[]) => {
+      if (typeof window === "undefined") return [];
 
-    const config = getResponsiveConfig();
-    const containerWidth = window.innerWidth - config.containerPadding * 2;
-    const minNoteWidth = config.noteWidth - 20; // Slightly smaller minimum for mobile
-    const columnsCount = Math.floor(
-      (containerWidth + config.gridGap) / (minNoteWidth + config.gridGap)
-    );
-    const actualColumnsCount = Math.max(1, columnsCount);
-
-    // Calculate note width for mobile
-    const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
-    const noteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
-
-    // Bin-packing for mobile with fewer columns
-    const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
-
-    return notesToLayout.map((note) => {
-      const noteHeight = calculateNoteHeight(
-        note,
-        noteWidth,
-        config.notePadding
+      const config = getResponsiveConfig();
+      const containerWidth = window.innerWidth - config.containerPadding * 2;
+      const minNoteWidth = config.noteWidth - 20; // Slightly smaller minimum for mobile
+      const columnsCount = Math.floor(
+        (containerWidth + config.gridGap) / (minNoteWidth + config.gridGap)
       );
+      const actualColumnsCount = Math.max(1, columnsCount);
 
-      // Find the column with the lowest bottom position
-      let bestColumn = 0;
-      let minBottom = columnBottoms[0];
+      // Calculate note width for mobile
+      const availableWidthForNotes = containerWidth - (actualColumnsCount - 1) * config.gridGap;
+      const noteWidth = Math.floor(availableWidthForNotes / actualColumnsCount);
 
-      for (let col = 1; col < actualColumnsCount; col++) {
-        if (columnBottoms[col] < minBottom) {
-          minBottom = columnBottoms[col];
-          bestColumn = col;
+      // Bin-packing for mobile with fewer columns
+      const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
+
+      return notesToLayout.map((note) => {
+        const noteHeight = calculateNoteHeight(note, noteWidth, config.notePadding);
+
+        // Find the column with the lowest bottom position
+        let bestColumn = 0;
+        let minBottom = columnBottoms[0];
+
+        for (let col = 1; col < actualColumnsCount; col++) {
+          if (columnBottoms[col] < minBottom) {
+            minBottom = columnBottoms[col];
+            bestColumn = col;
+          }
         }
-      }
 
-      // Place the note in the best column
-      const x = config.containerPadding + bestColumn * (noteWidth + config.gridGap);
-      const y = columnBottoms[bestColumn];
+        // Place the note in the best column
+        const x = config.containerPadding + bestColumn * (noteWidth + config.gridGap);
+        const y = columnBottoms[bestColumn];
 
-      // Update the column bottom position
-      columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
+        // Update the column bottom position
+        columnBottoms[bestColumn] = y + noteHeight + config.gridGap;
 
-      return {
-        ...note,
-        x,
-        y,
-        width: noteWidth,
-        height: noteHeight,
-      };
-    });
-  }, [calculateNoteHeight]);
+        return {
+          ...note,
+          x,
+          y,
+          width: noteWidth,
+          height: noteHeight,
+        };
+      });
+    },
+    [calculateNoteHeight]
+  );
 
   useEffect(() => {
     const initializeParams = async () => {
@@ -781,7 +781,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     try {
       const currentNote = notes.find((n) => n.id === noteId);
       if (!currentNote) return;
-      
+
       // Fallback to current page's boardId when note payload doesn't include board info (e.g., in tests)
       const targetBoardId = currentNote.board?.id ?? currentNote.boardId ?? boardId;
       if (!targetBoardId) return;
