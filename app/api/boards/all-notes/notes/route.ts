@@ -20,7 +20,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No organization found" }, { status: 403 });
     }
 
-    const [latestNote, noteCount] = await Promise.all([
+    const [
+      latestNote,
+      noteCount,
+      latestChecklistItem,
+      checklistItemCount,
+    ] = await Promise.all([
       db.note.findFirst({
         where: {
           deletedAt: null,
@@ -37,9 +42,34 @@ export async function GET(request: NextRequest) {
           board: { organizationId: user.organizationId },
         },
       }),
+      db.checklistItem.findFirst({
+        where: {
+          note: {
+            deletedAt: null,
+            archivedAt: null,
+            board: { organizationId: user.organizationId },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
+      db.checklistItem.count({
+        where: {
+          note: {
+            deletedAt: null,
+            archivedAt: null,
+            board: { organizationId: user.organizationId },
+          },
+        },
+      }),
     ]);
 
-    const etag = `${noteCount}-${latestNote?.updatedAt?.toISOString() || "empty"}`;
+    const etag = [
+      noteCount,
+      latestNote?.updatedAt?.toISOString() || "empty",
+      checklistItemCount,
+      latestChecklistItem?.updatedAt?.toISOString() || "empty",
+    ].join("-");
 
     const etagMatch = checkEtagMatch(request, etag);
     if (etagMatch) return etagMatch;

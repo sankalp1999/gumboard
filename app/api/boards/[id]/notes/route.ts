@@ -50,8 +50,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // Generate ETag from timestamp and count (minimal DB query)
-    const [latestNote, noteCount] = await Promise.all([
+    // Generate ETag from notes and checklist items to capture changes in either
+    const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
       db.note.findFirst({
         where: { boardId, deletedAt: null, archivedAt: null },
         orderBy: { updatedAt: "desc" },
@@ -60,9 +60,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       db.note.count({
         where: { boardId, deletedAt: null, archivedAt: null },
       }),
+      db.checklistItem.findFirst({
+        where: { note: { boardId, deletedAt: null, archivedAt: null } },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
+      db.checklistItem.count({
+        where: { note: { boardId, deletedAt: null, archivedAt: null } },
+      }),
     ]);
 
-    const etag = `${noteCount}-${latestNote?.updatedAt?.toISOString() || "empty"}`;
+    const etag = [
+      noteCount,
+      latestNote?.updatedAt?.toISOString() || "empty",
+      checklistItemCount,
+      latestChecklistItem?.updatedAt?.toISOString() || "empty",
+    ].join("-");
 
     // Check if client has matching ETag
     const etagMatch = checkEtagMatch(request, etag);
