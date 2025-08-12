@@ -27,7 +27,7 @@ export function usePolling<T = unknown>({
 }: UsePollingOptions<T>) {
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTabActiveRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastDataRef = useRef<string | null>(null);
@@ -35,6 +35,7 @@ export function usePolling<T = unknown>({
   const etagRef = useRef<string | null>(null);
   const retryCountRef = useRef(0);
   const lastUrlRef = useRef(url);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     const updateActivity = () => {
@@ -51,12 +52,14 @@ export function usePolling<T = unknown>({
 
   const fetchData = useCallback(async () => {
     if (!enabled || !isTabActiveRef.current) return;
+    if (isFetchingRef.current) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
     abortControllerRef.current = new AbortController();
+    isFetchingRef.current = true;
 
     try {
       const headers: HeadersInit = {
@@ -118,6 +121,8 @@ export function usePolling<T = unknown>({
           console.error('Polling error after max retries:', error);
         }
       }
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [url, enabled, onUpdate]);
 
@@ -137,6 +142,10 @@ export function usePolling<T = unknown>({
 
   useEffect(() => {
     if (lastUrlRef.current !== url) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       etagRef.current = null;
       lastDataRef.current = null;
       retryCountRef.current = 0;
