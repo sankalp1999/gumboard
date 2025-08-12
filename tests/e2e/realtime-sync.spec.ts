@@ -226,12 +226,8 @@ test.describe('Real-time Synchronization', () => {
     
     expect(sharedNotesData[0].content).toBe('User 2 updated content');
     
-    await page1.waitForTimeout(6000);
-    
-    const noteCount1 = await page1.locator('.note-background').count();
-    const noteCount2 = await page2.locator('.note-background').count();
-    expect(noteCount1).toBe(1);
-    expect(noteCount2).toBe(1);
+    await expect.poll(async () => await page1.locator('.note-background').count()).toBe(1);
+    await expect.poll(async () => await page2.locator('.note-background').count()).toBe(1);
     
     await context1.close();
     await context2.close();
@@ -270,12 +266,8 @@ test.describe('Real-time Synchronization', () => {
     expect(sharedNotesData.length).toBe(1);
     expect(sharedNotesData[0].content).toBe('Note to keep');
     
-    await page2.waitForTimeout(6000);
-    
-    const noteCount1 = await page1.locator('.note-background').count();
-    const noteCount2 = await page2.locator('.note-background').count();
-    expect(noteCount1).toBe(1);
-    expect(noteCount2).toBe(1);
+    await expect.poll(async () => await page1.locator('.note-background').count()).toBe(1);
+    await expect.poll(async () => await page2.locator('.note-background').count()).toBe(1);
     
     await context1.close();
     await context2.close();

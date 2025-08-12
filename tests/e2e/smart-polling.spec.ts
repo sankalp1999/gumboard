@@ -227,10 +227,9 @@ test.describe('Smart Polling', () => {
     const initialNoteCount = await page.locator('.note-background').count();
     expect(initialNoteCount).toBe(1);
     
-    await page.waitForTimeout(8000);
-    
-    const updatedNoteCount = await page.locator('.note-background').count();
-    expect(updatedNoteCount).toBe(2);
+    await expect.poll(async () => {
+      return await page.locator('.note-background').count();
+    }).toBe(2);
   });
 
   test('should clean up polling on navigation', async ({ page }) => {
