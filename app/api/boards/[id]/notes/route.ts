@@ -8,6 +8,7 @@ import {
   shouldSendNotification,
 } from "@/lib/slack";
 import { NOTE_COLORS } from "@/lib/constants";
+import { checkEtagMatch, createEtagResponse } from "@/lib/etag";
 
 // Get all notes for a board
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,68 +16,96 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth();
     const boardId = (await params).id;
 
-    const board = await db.board.findUnique({
+    // First check board exists and permissions with minimal data
+    const boardMeta = await db.board.findUnique({
       where: { id: boardId },
       select: {
         id: true,
         isPublic: true,
         organizationId: true,
-        notes: {
-          where: {
-            deletedAt: null, // Only include non-deleted notes
-            archivedAt: null,
-          },
-          select: {
-            id: true,
-            content: true,
-            color: true,
-            boardId: true,
-            createdBy: true,
-            createdAt: true,
-            updatedAt: true,
-            archivedAt: true,
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            checklistItems: { orderBy: { order: "asc" } },
-          },
-          orderBy: { createdAt: "desc" },
-        },
       },
     });
 
-    if (!board) {
+    if (!boardMeta) {
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
     }
 
-    if (board.isPublic) {
-      return NextResponse.json({ notes: board.notes });
+    // Check permissions for non-public boards
+    if (!boardMeta.isPublic) {
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { organizationId: true },
+      });
+
+      if (!user?.organizationId) {
+        return NextResponse.json({ error: "No organization found" }, { status: 403 });
+      }
+
+      if (boardMeta.organizationId !== user.organizationId) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      }
     }
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // ETag incorporates notes and checklist items
+    const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
+      db.note.findFirst({
+        where: { boardId, deletedAt: null, archivedAt: null },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
+      db.note.count({
+        where: { boardId, deletedAt: null, archivedAt: null },
+      }),
+      db.checklistItem.findFirst({
+        where: { note: { boardId, deletedAt: null, archivedAt: null } },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
+      db.checklistItem.count({
+        where: { note: { boardId, deletedAt: null, archivedAt: null } },
+      }),
+    ]);
 
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
+    const etag = [
+      noteCount,
+      latestNote?.updatedAt?.toISOString() || "empty",
+      checklistItemCount,
+      latestChecklistItem?.updatedAt?.toISOString() || "empty",
+    ].join("-");
+
+    // Check if client has matching ETag
+    const etagMatch = checkEtagMatch(request, etag);
+    if (etagMatch) return etagMatch;
+
+    // Only fetch full notes if ETag doesn't match
+    const notes = await db.note.findMany({
+      where: { boardId, deletedAt: null, archivedAt: null },
       select: {
-        organizationId: true,
+        id: true,
+        content: true,
+        color: true,
+        boardId: true,
+        createdBy: true,
+        createdAt: true,
+        updatedAt: true,
+        archivedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        checklistItems: { orderBy: { order: "asc" } },
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    if (!user?.organizationId) {
-      return NextResponse.json({ error: "No organization found" }, { status: 403 });
-    }
-
-    if (board.organizationId !== user.organizationId) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    }
-
-    return NextResponse.json({ notes: board.notes });
+    return createEtagResponse({ notes }, etag);
   } catch (error) {
     console.error("Error fetching notes:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

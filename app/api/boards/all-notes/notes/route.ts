@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { NOTE_COLORS } from "@/lib/constants";
+import { checkEtagMatch, createEtagResponse } from "@/lib/etag";
 
-// Get all notes from all boards in the organization
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -12,20 +11,67 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user with organization
     const user = await db.user.findUnique({
       where: { id: session.user.id },
-      include: { organization: true },
+      select: { organizationId: true },
     });
 
     if (!user?.organizationId) {
       return NextResponse.json({ error: "No organization found" }, { status: 403 });
     }
 
-    // Get all notes from all boards in the organization
+    const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
+      db.note.findFirst({
+        where: {
+          deletedAt: null,
+          archivedAt: null,
+          board: { organizationId: user.organizationId },
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
+      db.note.count({
+        where: {
+          deletedAt: null,
+          archivedAt: null,
+          board: { organizationId: user.organizationId },
+        },
+      }),
+      db.checklistItem.findFirst({
+        where: {
+          note: {
+            deletedAt: null,
+            archivedAt: null,
+            board: { organizationId: user.organizationId },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      }),
+      db.checklistItem.count({
+        where: {
+          note: {
+            deletedAt: null,
+            archivedAt: null,
+            board: { organizationId: user.organizationId },
+          },
+        },
+      }),
+    ]);
+
+    const etag = [
+      noteCount,
+      latestNote?.updatedAt?.toISOString() || "empty",
+      checklistItemCount,
+      latestChecklistItem?.updatedAt?.toISOString() || "empty",
+    ].join("-");
+
+    const etagMatch = checkEtagMatch(request, etag);
+    if (etagMatch) return etagMatch;
+
     const notes = await db.note.findMany({
       where: {
-        deletedAt: null, // Only include non-deleted notes
+        deletedAt: null,
         archivedAt: null,
         board: {
           organizationId: user.organizationId,
@@ -52,7 +98,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ notes });
+    return createEtagResponse({ notes }, etag);
   } catch (error) {
     console.error("Error fetching global notes:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
