@@ -25,6 +25,60 @@ test.describe("Real-time Synchronization", () => {
     store.setAll([]);
   });
 
+  test("should sync checklist item changes between two users", async ({ browser }) => {
+    const seeded = createMockNote({ content: "", boardId: "test-board", userId: "user-1" });
+    store.add(seeded);
+
+    const context1 = await browser.newContext();
+    const context2 = await browser.newContext();
+    const page1 = await context1.newPage();
+    const page2 = await context2.newPage();
+
+    await setupMockRoutes(page1, "user-1");
+    await setupMockRoutes(page2, "user-2");
+
+    await page1.goto("/boards/test-board");
+    await page2.goto("/boards/test-board");
+
+    await page1.waitForTimeout(1000);
+    await page2.waitForTimeout(1000);
+
+    await page1.getByRole("button", { name: "Add task" }).first().click();
+    await page1.getByPlaceholder("Add new item...").fill("First item");
+    await page1.getByPlaceholder("Add new item...").press("Enter");
+
+    await expect.poll(
+      () => store.all().find((n) => n.id === seeded.id)?.checklistItems?.length
+    ).toBe(1);
+
+    const itemId = store.all().find((n) => n.id === seeded.id)?.checklistItems?.[0]?.id as string;
+
+    await expect.poll(async () => await page2.getByTestId(itemId).count()).toBe(1);
+
+    const itemRow1 = page1.getByTestId(itemId);
+    await itemRow1.getByRole("checkbox", { disabled: false }).click();
+
+    await expect.poll(async () => {
+      const row = page2.getByTestId(itemId);
+      const state = await row.getByRole("checkbox", { disabled: false }).getAttribute("data-state");
+      return state;
+    }).toBe("checked");
+
+    await itemRow1.getByText("First item").click();
+    const editInput = itemRow1
+      .locator('input[type="text"]').filter({ hasValue: "First item" })
+      .first();
+    await editInput.fill("First item edited");
+    await editInput.press("Enter");
+
+    await page2.waitForTimeout(5000);
+    const itemRow2 = page2.getByTestId(itemId);
+    await expect.poll(async () => await itemRow2.getByText("First item edited").count()).toBeGreaterThan(0);
+
+    await context1.close();
+    await context2.close();
+  });
+
   test("should sync note creation between multiple users", async ({ browser }) => {
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();

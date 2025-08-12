@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // Generate ETag from notes and checklist items to capture changes in either
+    // ETag incorporates notes and checklist items
     const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
       db.note.findFirst({
         where: { boardId, deletedAt: null, archivedAt: null },
