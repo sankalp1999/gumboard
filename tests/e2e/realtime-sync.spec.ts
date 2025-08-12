@@ -1,148 +1,17 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test'
+import { mockAuth, mockBoards, mockBoard, createSharedNotesStore, mockBoardNotes, createMockNote } from '../fixtures/api-mocks';
 
 test.describe('Real-time Synchronization', () => {
-  let sharedNotesData: any[] = [];
-  let noteIdCounter = 1;
-
-  const createMockNote = (content: string, userId = 'user-1') => ({
-    id: `note-${noteIdCounter++}`,
-    content,
-    color: '#fef3c7',
-    archivedAt: null,
-    checklistItems: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    boardId: 'test-board',
-    board: {
-      id: 'test-board',
-      name: 'Test Board',
-    },
-    user: {
-      id: userId,
-      name: userId === 'user-1' ? 'User One' : 'User Two',
-      email: `${userId}@example.com`,
-    },
-  });
-
+  const store = createSharedNotesStore();
   const setupMockRoutes = async (page: Page, userId: string) => {
-    await page.route('**/api/auth/session', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          user: {
-            id: userId,
-            email: `${userId}@example.com`,
-            name: userId === 'user-1' ? 'User One' : 'User Two',
-          }
-        }),
-      });
-    });
-
-    await page.route('**/api/user', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: userId,
-          email: `${userId}@example.com`,
-          name: userId === 'user-1' ? 'User One' : 'User Two',
-          isAdmin: true,
-          organizationId: 'test-org',
-        }),
-      });
-    });
-
-    await page.route('**/api/boards', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          boards: [
-            {
-              id: 'test-board',
-              name: 'Test Board',
-              description: 'A test board',
-            },
-          ],
-        }),
-      });
-    });
-
-    await page.route('**/api/boards/test-board', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          board: {
-            id: 'test-board',
-            name: 'Test Board',
-            description: 'A test board',
-          },
-        }),
-      });
-    });
-
-    await page.route('**/api/boards/test-board/notes', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          headers: {
-            'ETag': `etag-${sharedNotesData.length}-${Date.now()}`,
-          },
-          body: JSON.stringify({ notes: sharedNotesData }),
-        });
-      } else if (route.request().method() === 'POST') {
-        const postData = await route.request().postDataJSON();
-        const newNote = createMockNote(postData.content || '', userId);
-        
-        if (postData.checklistItems) {
-          newNote.checklistItems = postData.checklistItems;
-        }
-        
-        sharedNotesData.push(newNote);
-        
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({ note: newNote }),
-        });
-      }
-    });
-
-    await page.route('**/api/boards/test-board/notes/*', async (route) => {
-      const noteId = route.request().url().split('/').pop();
-      
-      if (route.request().method() === 'PUT') {
-        const putData = await route.request().postDataJSON();
-        const noteIndex = sharedNotesData.findIndex(n => n.id === noteId);
-        
-        if (noteIndex !== -1) {
-          sharedNotesData[noteIndex] = {
-            ...sharedNotesData[noteIndex],
-            ...putData,
-            updatedAt: new Date().toISOString(),
-          };
-          
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ note: sharedNotesData[noteIndex] }),
-          });
-        } else {
-          await route.fulfill({ status: 404 });
-        }
-      } else if (route.request().method() === 'DELETE') {
-        sharedNotesData = sharedNotesData.filter(n => n.id !== noteId);
-        await route.fulfill({ status: 200 });
-      }
-    });
+    await mockAuth(page, { id: userId, email: `${userId}@example.com`, name: userId === 'user-1' ? 'User One' : 'User Two' });
+    await mockBoards(page, [{ id: 'test-board', name: 'Test Board', description: 'A test board' }]);
+    await mockBoard(page, { id: 'test-board', name: 'Test Board', description: 'A test board' });
+    await mockBoardNotes(page, 'test-board', store);
   };
 
   test.beforeEach(async () => {
-    sharedNotesData = [];
-    noteIdCounter = 1;
+    store.setAll([]);
   });
 
   test('should sync note creation between multiple users', async ({ browser }) => {
@@ -161,7 +30,7 @@ test.describe('Real-time Synchronization', () => {
     await page1.waitForTimeout(1000);
     await page2.waitForTimeout(1000);
     
-    expect(sharedNotesData.length).toBe(0);
+    expect(store.all().length).toBe(0);
     
     await page1.evaluate(() => {
       fetch('/api/boards/test-board/notes', {
@@ -173,8 +42,8 @@ test.describe('Real-time Synchronization', () => {
     
     await page1.waitForTimeout(1000);
     
-    expect(sharedNotesData.length).toBe(1);
-    expect(sharedNotesData[0].content).toBe('Note from User 1');
+    expect(store.all().length).toBe(1);
+    expect(store.all()[0].content).toBe('Note from User 1');
     
     await page2.waitForTimeout(5000);
     
@@ -188,16 +57,16 @@ test.describe('Real-time Synchronization', () => {
     
     await page2.waitForTimeout(1000);
     
-    expect(sharedNotesData.length).toBe(2);
-    expect(sharedNotesData.find(n => n.content === 'Note from User 2')).toBeTruthy();
+    expect(store.all().length).toBe(2);
+    expect(store.all().find(n => n.content === 'Note from User 2')).toBeTruthy();
     
     await context1.close();
     await context2.close();
   });
 
   test('should preserve active edits during polling updates', async ({ browser }) => {
-    const existingNote = createMockNote('Original content', 'user-1');
-    sharedNotesData.push(existingNote);
+    const existingNote = createMockNote({ content: 'Original content', userId: 'user-1', boardId: 'test-board' });
+    store.add(existingNote);
     
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
@@ -214,17 +83,18 @@ test.describe('Real-time Synchronization', () => {
     await page1.waitForTimeout(2000);
     await page2.waitForTimeout(2000);
     
-    await page2.evaluate(() => {
-      fetch('/api/boards/test-board/notes/note-1', {
+    await page2.evaluate((id) => {
+      fetch(`/api/boards/test-board/notes/${id}` , {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'User 2 updated content' })
       });
-    });
+    }, existingNote.id);
     
     await page2.waitForTimeout(1000);
     
-    expect(sharedNotesData[0].content).toBe('User 2 updated content');
+    // ensure store updated
+    expect(store.all().find(n => n.id === existingNote.id)?.content).toBe('User 2 updated content');
     
     await expect.poll(async () => await page1.locator('.note-background').count()).toBe(1);
     await expect.poll(async () => await page2.locator('.note-background').count()).toBe(1);
@@ -234,9 +104,10 @@ test.describe('Real-time Synchronization', () => {
   });
 
   test('should sync note deletions across sessions', async ({ browser }) => {
-    const note1 = createMockNote('Note to keep', 'user-1');
-    const note2 = createMockNote('Note to delete', 'user-1');
-    sharedNotesData.push(note1, note2);
+    const note1 = createMockNote({ content: 'Note to keep', userId: 'user-1', boardId: 'test-board' });
+    const note2 = createMockNote({ content: 'Note to delete', userId: 'user-1', boardId: 'test-board' });
+    store.add(note1);
+    store.add(note2);
     
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
@@ -253,18 +124,18 @@ test.describe('Real-time Synchronization', () => {
     await page1.waitForTimeout(1000);
     await page2.waitForTimeout(1000);
     
-    expect(sharedNotesData.length).toBe(2);
+    expect(store.all().length).toBe(2);
     
-    await page1.evaluate(() => {
-      fetch('/api/boards/test-board/notes/note-2', {
+    await page1.evaluate((id) => {
+      fetch(`/api/boards/test-board/notes/${id}` , {
         method: 'DELETE'
       });
-    });
+    }, note2.id);
     
     await page1.waitForTimeout(1000);
     
-    expect(sharedNotesData.length).toBe(1);
-    expect(sharedNotesData[0].content).toBe('Note to keep');
+    expect(store.all().length).toBe(1);
+    expect(store.all()[0].content).toBe('Note to keep');
     
     await expect.poll(async () => await page1.locator('.note-background').count()).toBe(1);
     await expect.poll(async () => await page2.locator('.note-background').count()).toBe(1);

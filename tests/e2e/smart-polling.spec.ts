@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { mockAuth, mockBoards, mockBoard } from '../fixtures/api-mocks';
 
 test.describe('Smart Polling', () => {
   let requestCount = 0;
@@ -23,64 +24,9 @@ test.describe('Smart Polling', () => {
   test.beforeEach(async ({ page }) => {
     requestCount = 0;
     etagValue = 'initial-etag';
-    
-    await page.route('**/api/auth/session', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          user: {
-            id: 'test-user',
-            email: 'test@example.com',
-            name: 'Test User',
-          }
-        }),
-      });
-    });
-
-    await page.route('**/api/user', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'test-user',
-          email: 'test@example.com',
-          name: 'Test User',
-          isAdmin: true,
-          organizationId: 'test-org',
-        }),
-      });
-    });
-
-    await page.route('**/api/boards', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          boards: [
-            {
-              id: 'test-board',
-              name: 'Test Board',
-              description: 'A test board',
-            },
-          ],
-        }),
-      });
-    });
-
-    await page.route('**/api/boards/test-board', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          board: {
-            id: 'test-board',
-            name: 'Test Board',
-            description: 'A test board',
-          },
-        }),
-      });
-    });
+    await mockAuth(page, { id: 'test-user', email: 'test@example.com', name: 'Test User' });
+    await mockBoards(page, [{ id: 'test-board', name: 'Test Board', description: 'A test board' }]);
+    await mockBoard(page, { id: 'test-board', name: 'Test Board', description: 'A test board' });
   });
 
   test('should use ETag caching effectively', async ({ page }) => {
