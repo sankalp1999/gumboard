@@ -76,7 +76,7 @@ export default function Dashboard() {
   }>({ open: false, title: "", description: "" });
   const [copiedBoardId, setCopiedBoardId] = useState<string | null>(null);
   const router = useRouter();
-  
+
   const { error: boardsPollingError } = useBoardsListPolling({
     enabled: !loading,
     pollingInterval: 5000,

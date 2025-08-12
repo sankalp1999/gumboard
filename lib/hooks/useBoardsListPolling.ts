@@ -1,4 +1,4 @@
-import { usePolling } from './usePolling';
+import { usePolling } from "./usePolling";
 
 interface UseBoardsListPollingOptions<T = { boards: unknown[] }> {
   enabled?: boolean;
@@ -12,7 +12,7 @@ export function useBoardsListPolling<T = { boards: unknown[] }>({
   onUpdate,
 }: UseBoardsListPollingOptions<T> = {}) {
   return usePolling<T>({
-    url: '/api/boards',
+    url: "/api/boards",
     enabled,
     interval: pollingInterval,
     onUpdate,

@@ -19,11 +19,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // First check board exists and permissions with minimal data
     const boardMeta = await db.board.findUnique({
       where: { id: boardId },
-      select: { 
+      select: {
         id: true,
         isPublic: true,
-        organizationId: true
-      }
+        organizationId: true,
+      },
     });
 
     if (!boardMeta) {
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
       const user = await db.user.findUnique({
         where: { id: session.user.id },
-        select: { organizationId: true }
+        select: { organizationId: true },
       });
 
       if (!user?.organizationId) {
@@ -54,16 +54,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const [latestNote, noteCount] = await Promise.all([
       db.note.findFirst({
         where: { boardId, deletedAt: null, archivedAt: null },
-        orderBy: { updatedAt: 'desc' },
-        select: { updatedAt: true }
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
       }),
       db.note.count({
-        where: { boardId, deletedAt: null, archivedAt: null }
-      })
+        where: { boardId, deletedAt: null, archivedAt: null },
+      }),
     ]);
 
-    const etag = `${noteCount}-${latestNote?.updatedAt?.toISOString() || 'empty'}`;
-    
+    const etag = `${noteCount}-${latestNote?.updatedAt?.toISOString() || "empty"}`;
+
     // Check if client has matching ETag
     const etagMatch = checkEtagMatch(request, etag);
     if (etagMatch) return etagMatch;

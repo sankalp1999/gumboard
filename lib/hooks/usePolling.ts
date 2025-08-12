@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from "react";
 
 const ACTIVITY_THRESHOLD = 30000;
 const MAX_BACKOFF_INTERVAL = 10000;
@@ -14,7 +14,7 @@ interface UsePollingOptions<T = unknown> {
 }
 
 const getAdaptiveInterval = (timeSinceActivity: number, baseInterval: number): number => {
-  return timeSinceActivity > ACTIVITY_THRESHOLD 
+  return timeSinceActivity > ACTIVITY_THRESHOLD
     ? Math.min(baseInterval * BACKOFF_MULTIPLIER, MAX_BACKOFF_INTERVAL)
     : baseInterval;
 };
@@ -41,12 +41,12 @@ export function usePolling<T = unknown>({
     const updateActivity = () => {
       lastActivityRef.current = Date.now();
     };
-    
-    const events = ['mousedown', 'keydown', 'touchstart'];
-    events.forEach(e => document.addEventListener(e, updateActivity));
-    
+
+    const events = ["mousedown", "keydown", "touchstart"];
+    events.forEach((e) => document.addEventListener(e, updateActivity));
+
     return () => {
-      events.forEach(e => document.removeEventListener(e, updateActivity));
+      events.forEach((e) => document.removeEventListener(e, updateActivity));
     };
   }, []);
 
@@ -63,18 +63,18 @@ export function usePolling<T = unknown>({
 
     try {
       const headers: HeadersInit = {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
       };
-      
+
       if (etagRef.current) {
-        headers['If-None-Match'] = etagRef.current;
+        headers["If-None-Match"] = etagRef.current;
       }
 
       const response = await fetch(url, {
         signal: abortControllerRef.current.signal,
         headers,
-        credentials: 'same-origin',
+        credentials: "same-origin",
       });
 
       if (response.status === 304) {
@@ -84,20 +84,20 @@ export function usePolling<T = unknown>({
       }
 
       if (response.ok) {
-        const newEtag = response.headers.get('ETag');
+        const newEtag = response.headers.get("ETag");
         if (newEtag) {
           etagRef.current = newEtag;
         }
 
         const data = await response.json();
         const dataStr = JSON.stringify(data);
-        
+
         if (dataStr !== lastDataRef.current) {
           lastDataRef.current = dataStr;
           setLastSync(new Date());
           onUpdate?.(data);
         }
-        
+
         retryCountRef.current = 0;
         setError(null);
       } else if (response.status >= 400 && response.status < 500) {
@@ -107,7 +107,7 @@ export function usePolling<T = unknown>({
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
+      if (error instanceof Error && error.name !== "AbortError") {
         if (retryCountRef.current < MAX_RETRY_ATTEMPTS) {
           retryCountRef.current++;
           const delay = RETRY_DELAY_BASE * Math.pow(2, retryCountRef.current - 1);
@@ -118,7 +118,7 @@ export function usePolling<T = unknown>({
           }, delay);
         } else {
           setError(error.message);
-          console.error('Polling error after max retries:', error);
+          console.error("Polling error after max retries:", error);
         }
       }
     } finally {
@@ -134,9 +134,9 @@ export function usePolling<T = unknown>({
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [fetchData, enabled]);
 
@@ -172,7 +172,7 @@ export function usePolling<T = unknown>({
         if (isTabActiveRef.current && enabled) {
           fetchData();
         }
-        
+
         if (enabled) {
           const timeSinceActivity = Date.now() - lastActivityRef.current;
           const nextInterval = getAdaptiveInterval(timeSinceActivity, interval);
@@ -180,7 +180,7 @@ export function usePolling<T = unknown>({
         }
       }, delay);
     };
-    
+
     fetchData();
     const timeSinceActivity = Date.now() - lastActivityRef.current;
     const initialInterval = getAdaptiveInterval(timeSinceActivity, interval);

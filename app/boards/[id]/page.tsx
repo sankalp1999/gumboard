@@ -69,28 +69,31 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const boardRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const { error: pollingError } = useBoardNotesPolling({
     boardId,
     enabled: !loading && !!boardId,
-    pollingInterval: 4000, 
-    onUpdate: useCallback((data: { notes: Note[] }) => {
-      setNotes((prevNotes) => {
-        const currentEditingId = editingNoteId;
-        const prevMap = new Map(prevNotes.map(n => [n.id, n]));
-        return data.notes.map(newNote => {
-          if (currentEditingId && newNote.id === currentEditingId) {
-            return prevMap.get(newNote.id) ?? newNote;
-          }
-          return newNote;
+    pollingInterval: 4000,
+    onUpdate: useCallback(
+      (data: { notes: Note[] }) => {
+        setNotes((prevNotes) => {
+          const currentEditingId = editingNoteId;
+          const prevMap = new Map(prevNotes.map((n) => [n.id, n]));
+          return data.notes.map((newNote) => {
+            if (currentEditingId && newNote.id === currentEditingId) {
+              return prevMap.get(newNote.id) ?? newNote;
+            }
+            return newNote;
+          });
         });
-      });
-    }, [editingNoteId]),
+      },
+      [editingNoteId]
+    ),
   });
 
   useEffect(() => {
-    if (pollingError && pollingError.includes('Client error: 401')) {
-      router.push('/auth/signin');
+    if (pollingError && pollingError.includes("Client error: 401")) {
+      router.push("/auth/signin");
     }
   }, [pollingError, router]);
 
