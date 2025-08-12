@@ -77,15 +77,11 @@ export default function PublicBoardPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-<<<<<<< HEAD
   const calculateNoteHeight = useCallback((
     note: Note,
     noteWidth?: number,
     notePadding?: number
   ) => {
-=======
-  const calculateNoteHeight = (note: Note, noteWidth?: number, notePadding?: number) => {
->>>>>>> origin/main
     const config = getResponsiveConfig();
     const actualNotePadding = notePadding || config.notePadding;
     const actualNoteWidth = noteWidth || config.noteWidth;
@@ -259,17 +255,12 @@ export default function PublicBoardPage({ params }: { params: Promise<{ id: stri
 
     const columnBottoms: number[] = new Array(actualColumnsCount).fill(config.containerPadding);
 
-<<<<<<< HEAD
     return notesToLayout.map((note) => {
       const noteHeight = calculateNoteHeight(
         note,
         noteWidth,
         config.notePadding
       );
-=======
-    return filteredNotes.map((note) => {
-      const noteHeight = calculateNoteHeight(note, noteWidth, config.notePadding);
->>>>>>> origin/main
 
       let bestColumn = 0;
       let minBottom = columnBottoms[0];

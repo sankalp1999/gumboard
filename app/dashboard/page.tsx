@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { BetaBadge } from "@/components/ui/beta-badge";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Grid3x3, Copy, Edit3, Archive } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FullPageLoader } from "@/components/ui/loader";
@@ -84,11 +84,7 @@ export default function Dashboard() {
     },
   });
 
-  useEffect(() => {
-    fetchUserAndBoards();
-  }, []);
-
-  const fetchUserAndBoards = async () => {
+  const fetchUserAndBoards = useCallback(async () => {
     try {
       const userResponse = await fetch("/api/user");
       if (userResponse.status === 401) {
@@ -119,7 +115,11 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    fetchUserAndBoards();
+  }, [fetchUserAndBoards]);
 
   const handleAddBoard = async (values: z.infer<typeof formSchema>) => {
     const { name, description } = values;
