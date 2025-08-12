@@ -12,6 +12,8 @@ export function checkEtagMatch(
       status: 304,
       headers: { 
         'ETag': etag,
+        'Cache-Control': 'no-cache',
+        'Vary': 'If-None-Match',
         ...additionalHeaders 
       }
     })
@@ -27,6 +29,8 @@ export function createEtagResponse(
   return NextResponse.json(data, { 
     headers: { 
       'ETag': etag,
+      'Cache-Control': 'no-cache',
+      'Vary': 'If-None-Match',
       ...additionalHeaders 
     } 
   })
