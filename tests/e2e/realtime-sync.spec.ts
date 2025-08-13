@@ -6,13 +6,12 @@ import type { TestContext } from "../fixtures/test-helpers";
 test.describe("Real-time Synchronization (DB-backed)", () => {
   async function createSecondUserSession(testPrisma: PrismaClient, testContext: TestContext) {
     const secondUserId = `usr2_${testContext.testId}`;
-    const secondEmail = `user2-${testContext.testId}@example.com`;
     const secondSessionToken = `sess_${testContext.testId}_${randomBytes(16).toString("hex")}`;
 
     await testPrisma.user.create({
       data: {
         id: secondUserId,
-        email: secondEmail,
+        email: `user2-${testContext.testId}@example.com`,
         name: `User Two ${testContext.testId}`,
         organizationId: testContext.organizationId,
         isAdmin: true,
@@ -46,11 +45,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     });
 
     const note = await testPrisma.note.create({
-      data: {
-        color: "#fef3c7",
-        boardId: board.id,
-        createdBy: testContext.userId,
-      },
+      data: { color: "#fef3c7", boardId: board.id, createdBy: testContext.userId },
     });
 
     const { secondSessionToken } = await createSecondUserSession(testPrisma, testContext);
@@ -91,9 +86,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const createdItem = updatedNoteAfterAdd!.checklistItems[0];
     expect(createdItem.content).toBe(itemContent);
 
-    await expect
-      .poll(async () => await page2.getByTestId(createdItem.id).count())
-      .toBe(1);
+    await expect.poll(async () => await page2.getByTestId(createdItem.id).count()).toBe(1);
 
     const toggleResponse = authenticatedPage.waitForResponse(
       (resp) =>
@@ -107,14 +100,9 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const toggledInDb = await testPrisma.checklistItem.findUnique({ where: { id: createdItem.id } });
     expect(toggledInDb?.checked).toBe(true);
 
-    await expect
-      .poll(async () =>
-        page2
-          .getByTestId(createdItem.id)
-          .getByRole("checkbox", { disabled: false })
-          .getAttribute("data-state")
-      )
-      .toBe("checked");
+    await expect.poll(async () =>
+      page2.getByTestId(createdItem.id).getByRole("checkbox", { disabled: false }).getAttribute("data-state")
+    ).toBe("checked");
 
     await authenticatedPage.getByTestId(createdItem.id).getByText(itemContent).click();
     const editInput = authenticatedPage.getByTestId(createdItem.id).getByRole("textbox").first();
@@ -132,9 +120,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const updatedItemDb = await testPrisma.checklistItem.findUnique({ where: { id: createdItem.id } });
     expect(updatedItemDb?.content).toBe(editedContent);
 
-    await expect
-      .poll(async () => await page2.getByTestId(createdItem.id).getByText(editedContent).count())
-      .toBeGreaterThan(0);
+    await expect.poll(async () => await page2.getByTestId(createdItem.id).getByText(editedContent).count()).toBeGreaterThan(0);
 
     await context2.close();
   });
@@ -172,33 +158,23 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    const createNoteResp1 = authenticatedPage.waitForResponse(
-      (resp) =>
-        resp.url().includes(`/api/boards/${board.id}/notes`) &&
-        resp.request().method() === "POST" &&
-        resp.status() === 201
-    );
     await authenticatedPage.getByRole("button", { name: "Add Your First Note" }).click();
-    await createNoteResp1;
+    await authenticatedPage.waitForResponse(
+      (resp) => resp.url().includes(`/api/boards/${board.id}/notes`) && resp.request().method() === "POST" && resp.status() === 201
+    );
 
     const notesAfterFirst = await testPrisma.note.findMany({ where: { boardId: board.id } });
     expect(notesAfterFirst).toHaveLength(1);
 
-    const createNoteResp2 = page2.waitForResponse(
-      (resp) =>
-        resp.url().includes(`/api/boards/${board.id}/notes`) &&
-        resp.request().method() === "POST" &&
-        resp.status() === 201
-    );
     await page2.getByRole("button", { name: "Add Note" }).click();
-    await createNoteResp2;
+    await page2.waitForResponse(
+      (resp) => resp.url().includes(`/api/boards/${board.id}/notes`) && resp.request().method() === "POST" && resp.status() === 201
+    );
 
     const notesAfterSecond = await testPrisma.note.findMany({ where: { boardId: board.id } });
     expect(notesAfterSecond).toHaveLength(2);
 
-    await expect
-      .poll(async () => await authenticatedPage.locator(".note-background").count())
-      .toBe(2);
+    await expect.poll(async () => await authenticatedPage.locator(".note-background").count()).toBe(2);
 
     await context2.close();
   });
@@ -224,13 +200,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
         boardId: board.id,
         createdBy: testContext.userId,
         checklistItems: {
-          create: [
-            {
-              content: "Original content",
-              checked: false,
-              order: 0,
-            },
-          ],
+          create: [{ content: "Original content", checked: false, order: 0 }],
         },
       },
     });
@@ -270,14 +240,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          checklistItems: [
-            {
-              id: itemId,
-              content: "User 2 updated content",
-              checked: false,
-              order: 0,
-            },
-          ],
+          checklistItems: [{ id: itemId, content: "User 2 updated content", checked: false, order: 0 }],
         }),
       });
     }, { boardId: board.id, id: note.id, itemId: noteChecklistItem?.id });
@@ -312,13 +275,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
         boardId: board.id,
         createdBy: testContext.userId,
         checklistItems: {
-          create: [
-            {
-              content: testContext.prefix("Note to keep"),
-              checked: false,
-              order: 0,
-            },
-          ],
+          create: [{ content: testContext.prefix("Note to keep"), checked: false, order: 0 }],
         },
       },
     });
@@ -328,13 +285,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
         boardId: board.id,
         createdBy: testContext.userId,
         checklistItems: {
-          create: [
-            {
-              content: testContext.prefix("Note to delete"),
-              checked: false,
-              order: 0,
-            },
-          ],
+          create: [{ content: testContext.prefix("Note to delete"), checked: false, order: 0 }],
         },
       },
     });
@@ -376,12 +327,8 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const keepNoteDb = await testPrisma.note.findUnique({ where: { id: keepNote.id } });
     expect(keepNoteDb?.deletedAt).toBeNull();
 
-    await expect
-      .poll(async () => await authenticatedPage.locator(".note-background").count())
-      .toBe(1);
-    await expect
-      .poll(async () => await page2.locator(".note-background").count())
-      .toBe(1);
+    await expect.poll(async () => await authenticatedPage.locator(".note-background").count()).toBe(1);
+    await expect.poll(async () => await page2.locator(".note-background").count()).toBe(1);
 
     await context2.close();
   });
@@ -426,16 +373,11 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await expect(editInput).toBeVisible();
     await expect(editInput).toHaveValue("Test item");
     
-    const updateResponse = authenticatedPage.waitForResponse(
-      (resp) =>
-        resp.url().includes(`/api/boards/${board.id}/notes/`) &&
-        resp.request().method() === "PUT" &&
-        resp.ok()
-    );
-    
     await editInput.fill("Updated test item");
     await authenticatedPage.click("body");
-    await updateResponse;
+    await authenticatedPage.waitForResponse(
+      (resp) => resp.url().includes(`/api/boards/${board.id}/notes/`) && resp.request().method() === "PUT" && resp.ok()
+    );
 
     const updatedResponse = await authenticatedPage.request.get(`/api/boards/${board.id}/notes?check=true`);
     const updatedData = await updatedResponse.json();
@@ -464,7 +406,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
       },
     });
 
-    await testPrisma.note.create({
+    const note = await testPrisma.note.create({
       data: {
         color: "#fef3c7",
         boardId: board.id,
@@ -476,7 +418,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     });
 
     const pollRequests: { timestamp: number; hasChanged: boolean }[] = [];
-    
     await authenticatedPage.route(`**/api/boards/${board.id}/notes?check=true`, async (route) => {
       const response = await route.fetch();
       const data = await response.json();
@@ -488,29 +429,21 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     });
 
     await authenticatedPage.goto(`/boards/${board.id}`);
-    
     await authenticatedPage.waitForTimeout(6000);
-    
     const initialPollCount = pollRequests.length;
     expect(initialPollCount).toBeGreaterThan(0);
     
-    await authenticatedPage.getByText("Polling item").click();
-    const editInput = authenticatedPage.getByRole("textbox").first();
+    const checklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
+    await authenticatedPage.getByTestId(checklistItem!.id).getByText("Polling item").click();
+    const editInput = authenticatedPage.getByTestId(checklistItem!.id).getByRole("textbox").first();
     await expect(editInput).toBeVisible();
-    
-    const updateResponse = authenticatedPage.waitForResponse(
-      (resp) =>
-        resp.url().includes(`/api/boards/${board.id}/notes/`) &&
-        resp.request().method() === "PUT" &&
-        resp.ok()
-    );
     
     await editInput.fill("Updated polling item");
     await authenticatedPage.click("body");
-    await updateResponse;
-    
+    await authenticatedPage.waitForResponse(
+      (resp) => resp.url().includes(`/api/boards/${board.id}/notes/`) && resp.request().method() === "PUT" && resp.ok()
+    );
     await authenticatedPage.waitForTimeout(5000);
-    
     const finalPollCount = pollRequests.length;
     expect(finalPollCount).toBeGreaterThan(initialPollCount);
     
