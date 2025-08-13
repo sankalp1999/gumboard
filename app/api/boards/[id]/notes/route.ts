@@ -15,13 +15,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth();
     const boardId = (await params).id;
 
-    // First check board exists and permissions with minimal data
     const boardMeta = await db.board.findUnique({
       where: { id: boardId },
       select: {
         id: true,
         isPublic: true,
         organizationId: true,
+        updatedAt: true,
       },
     });
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // If check-only, return just timestamp
     if (isCheckOnly) {
-      const [latestNote, latestChecklistItem, board] = await Promise.all([
+      const [latestNote, latestChecklistItem] = await Promise.all([
         db.note.findFirst({
           where: { boardId },
           orderBy: { updatedAt: "desc" },
@@ -65,16 +65,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           orderBy: { updatedAt: "desc" },
           select: { updatedAt: true },
         }),
-        db.board.findUnique({
-          where: { id: boardId },
-          select: { updatedAt: true },
-        }),
       ]);
 
       const timestamps = [
         latestNote?.updatedAt,
         latestChecklistItem?.updatedAt,
-        board?.updatedAt,
+        boardMeta.updatedAt,
       ].filter(Boolean) as Date[];
 
       const lastModified =

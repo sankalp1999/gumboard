@@ -13,11 +13,8 @@ export function useBoardNotesPolling<T = { notes: unknown[] }>({
   pollingInterval = 4000,
   onUpdate,
 }: UseBoardNotesPollingOptions<T>) {
-  const url =
-    boardId === "all-notes" ? "/api/boards/all-notes/notes" : `/api/boards/${boardId}/notes`;
-
   return usePolling<T>({
-    url,
+    url: boardId === "all-notes" ? "/api/boards/all-notes/notes" : `/api/boards/${boardId}/notes`,
     enabled: enabled && !!boardId,
     interval: pollingInterval,
     onUpdate,
