@@ -1,229 +1,361 @@
-import { test, expect, Page, BrowserContext } from "@playwright/test";
-import {
-  mockAuth,
-  mockBoards,
-  mockBoard,
-  createSharedNotesStore,
-  mockBoardNotes,
-  createMockNote,
-} from "../fixtures/api-mocks";
+import { test, expect } from "../fixtures/test-helpers";
+import { randomBytes } from "crypto";
+import type { PrismaClient } from "@prisma/client";
+import type { TestContext } from "../fixtures/test-helpers";
 
-test.describe("Real-time Synchronization", () => {
-  const store = createSharedNotesStore();
-  const setupMockRoutes = async (page: Page, userId: string) => {
-    await mockAuth(page, {
-      id: userId,
-      email: `${userId}@example.com`,
-      name: userId === "user-1" ? "User One" : "User Two",
+test.describe("Real-time Synchronization (DB-backed)", () => {
+  async function createSecondUserSession(testPrisma: PrismaClient, testContext: TestContext) {
+    const secondUserId = `usr2_${testContext.testId}`;
+    const secondEmail = `user2-${testContext.testId}@example.com`;
+    const secondSessionToken = `sess_${testContext.testId}_${randomBytes(16).toString("hex")}`;
+
+    await testPrisma.user.create({
+      data: {
+        id: secondUserId,
+        email: secondEmail,
+        name: `User Two ${testContext.testId}`,
+        organizationId: testContext.organizationId,
+      },
     });
-    await mockBoards(page, [{ id: "test-board", name: "Test Board", description: "A test board" }]);
-    await mockBoard(page, { id: "test-board", name: "Test Board", description: "A test board" });
-    await mockBoardNotes(page, "test-board", store);
-  };
 
-  test.beforeEach(async () => {
-    store.setAll([]);
-  });
+    await testPrisma.session.create({
+      data: {
+        sessionToken: secondSessionToken,
+        userId: secondUserId,
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
 
-  test("should sync checklist item changes between two users", async ({ browser }) => {
-    const seeded = createMockNote({ content: "", boardId: "test-board", userId: "user-1" });
-    store.add(seeded);
+    return { secondUserId, secondSessionToken } as const;
+  }
 
-    const context1 = await browser.newContext();
+  test("should sync checklist item changes between two users and persist in DB", async ({
+    authenticatedPage,
+    testContext,
+    testPrisma,
+    browser,
+  }) => {
+    const board = await testPrisma.board.create({
+      data: {
+        name: testContext.getBoardName("Realtime Board"),
+        description: testContext.prefix("A test board for realtime"),
+        createdBy: testContext.userId,
+        organizationId: testContext.organizationId,
+      },
+    });
+
+    const note = await testPrisma.note.create({
+      data: {
+        content: "",
+        color: "#fef3c7",
+        boardId: board.id,
+        createdBy: testContext.userId,
+      },
+    });
+
+    const { secondSessionToken } = await createSecondUserSession(testPrisma, testContext);
     const context2 = await browser.newContext();
-    const page1 = await context1.newPage();
+    await context2.addCookies([
+      {
+        name: "authjs.session-token",
+        value: secondSessionToken,
+        domain: "localhost",
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+      },
+    ]);
     const page2 = await context2.newPage();
 
-    await setupMockRoutes(page1, "user-1");
-    await setupMockRoutes(page2, "user-2");
+    await authenticatedPage.goto(`/boards/${board.id}`);
+    await page2.goto(`/boards/${board.id}`);
 
-    await page1.goto("/boards/test-board");
-    await page2.goto("/boards/test-board");
+    // Add a checklist item on page 1
+    await authenticatedPage.getByRole("button", { name: "Add task" }).first().click();
+    const itemContent = testContext.prefix("First item");
+    const addItemResponse = authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/${note.id}`) &&
+        resp.request().method() === "PUT" &&
+        resp.ok()
+    );
+    await authenticatedPage.getByPlaceholder("Add new item...").fill(itemContent);
+    await authenticatedPage.getByPlaceholder("Add new item...").press("Enter");
+    await addItemResponse;
 
-    await page1.waitForTimeout(1000);
-    await page2.waitForTimeout(1000);
+    // DB should have one checklist item
+    const updatedNoteAfterAdd = await testPrisma.note.findUnique({
+      where: { id: note.id },
+      include: { checklistItems: true },
+    });
+    expect(updatedNoteAfterAdd?.checklistItems).toHaveLength(1);
+    const createdItem = updatedNoteAfterAdd!.checklistItems[0];
+    expect(createdItem.content).toBe(itemContent);
 
-    await page1.getByRole("button", { name: "Add task" }).first().click();
-    await page1.getByPlaceholder("Add new item...").fill("First item");
-    await page1.getByPlaceholder("Add new item...").press("Enter");
-
+    // Page 2 should reflect the item after polling
     await expect
-      .poll(() => store.all().find((n) => n.id === seeded.id)?.checklistItems?.length)
+      .poll(async () => await page2.getByTestId(createdItem.id).count())
       .toBe(1);
 
-    const itemId = store.all().find((n) => n.id === seeded.id)?.checklistItems?.[0]?.id as string;
+    // Toggle completion on page 1 and verify DB + page 2
+    await authenticatedPage.getByTestId(createdItem.id).getByRole("checkbox", { disabled: false }).click();
 
-    await expect.poll(async () => await page2.getByTestId(itemId).count()).toBe(1);
-
-    const itemRow1 = page1.getByTestId(itemId);
-    await itemRow1.getByRole("checkbox", { disabled: false }).click();
+    const toggledInDb = await testPrisma.checklistItem.findUnique({ where: { id: createdItem.id } });
+    expect(toggledInDb?.checked).toBe(true);
 
     await expect
-      .poll(async () => {
-        const row = page2.getByTestId(itemId);
-        const state = await row
+      .poll(async () =>
+        page2
+          .getByTestId(createdItem.id)
           .getByRole("checkbox", { disabled: false })
-          .getAttribute("data-state");
-        return state;
-      })
+          .getAttribute("data-state")
+      )
       .toBe("checked");
 
-    await itemRow1.getByText("First item").click();
-    const editInput = itemRow1.getByRole("textbox").first();
-    await editInput.fill("First item edited");
-    await editInput.blur();
+    // Edit content on page 1 and verify DB + page 2
+    await authenticatedPage.getByTestId(createdItem.id).getByText(itemContent).click();
+    const editInput = authenticatedPage.getByTestId(createdItem.id).getByRole("textbox").first();
+    const editedContent = testContext.prefix("First item edited");
+    const saveEditResponse = authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/${note.id}`) &&
+        resp.request().method() === "PUT" &&
+        resp.ok()
+    );
+    await editInput.fill(editedContent);
+    await authenticatedPage.click("body");
+    await saveEditResponse;
 
-    await page2.waitForTimeout(5000);
-    const itemRow2 = page2.getByTestId(itemId);
+    const updatedItemDb = await testPrisma.checklistItem.findUnique({ where: { id: createdItem.id } });
+    expect(updatedItemDb?.content).toBe(editedContent);
+
     await expect
-      .poll(async () => await itemRow2.getByText("First item edited").count())
+      .poll(async () => await page2.getByTestId(createdItem.id).getByText(editedContent).count())
       .toBeGreaterThan(0);
 
-    await context1.close();
     await context2.close();
   });
 
-  test("should sync note creation between multiple users", async ({ browser }) => {
-    const context1 = await browser.newContext();
-    const context2 = await browser.newContext();
+  test("should sync note creation between multiple users and persist in DB", async ({
+    authenticatedPage,
+    testContext,
+    testPrisma,
+    browser,
+  }) => {
+    const board = await testPrisma.board.create({
+      data: {
+        name: testContext.getBoardName("Realtime Board Notes"),
+        description: testContext.prefix("Realtime notes board"),
+        createdBy: testContext.userId,
+        organizationId: testContext.organizationId,
+      },
+    });
 
-    const page1 = await context1.newPage();
+    const { secondSessionToken } = await createSecondUserSession(testPrisma, testContext);
+    const context2 = await browser.newContext();
+    await context2.addCookies([
+      {
+        name: "authjs.session-token",
+        value: secondSessionToken,
+        domain: "localhost",
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+      },
+    ]);
     const page2 = await context2.newPage();
 
-    await setupMockRoutes(page1, "user-1");
-    await setupMockRoutes(page2, "user-2");
+    await authenticatedPage.goto(`/boards/${board.id}`);
+    await page2.goto(`/boards/${board.id}`);
 
-    await page1.goto("/boards/test-board");
-    await page2.goto("/boards/test-board");
+    // Create first note from user1
+    const createNoteResp1 = authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes`) &&
+        resp.request().method() === "POST" &&
+        resp.status() === 201
+    );
+    await authenticatedPage.getByRole("button", { name: "Add Your First Note" }).click();
+    await createNoteResp1;
 
-    await page1.waitForTimeout(1000);
-    await page2.waitForTimeout(1000);
+    const notesAfterFirst = await testPrisma.note.findMany({ where: { boardId: board.id } });
+    expect(notesAfterFirst).toHaveLength(1);
 
-    expect(store.all().length).toBe(0);
+    // Create second note from user2
+    const createNoteResp2 = page2.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes`) &&
+        resp.request().method() === "POST" &&
+        resp.status() === 201
+    );
+    await page2.getByRole("button", { name: "Add Note" }).click();
+    await createNoteResp2;
 
-    await page1.evaluate(() => {
-      fetch("/api/boards/test-board/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "Note from User 1" }),
-      });
-    });
+    const notesAfterSecond = await testPrisma.note.findMany({ where: { boardId: board.id } });
+    expect(notesAfterSecond).toHaveLength(2);
 
-    await page1.waitForTimeout(1000);
+    // Page1 should observe the new note after polling
+    await expect
+      .poll(async () => await authenticatedPage.locator(".note-background").count())
+      .toBe(2);
 
-    expect(store.all().length).toBe(1);
-    expect(store.all()[0].content).toBe("Note from User 1");
-
-    await page2.waitForTimeout(5000);
-
-    await page2.evaluate(() => {
-      fetch("/api/boards/test-board/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "Note from User 2" }),
-      });
-    });
-
-    await page2.waitForTimeout(1000);
-
-    expect(store.all().length).toBe(2);
-    expect(store.all().find((n) => n.content === "Note from User 2")).toBeTruthy();
-
-    await context1.close();
     await context2.close();
   });
 
-  test("should preserve active edits during polling updates", async ({ browser }) => {
-    const existingNote = createMockNote({
-      content: "Original content",
-      userId: "user-1",
-      boardId: "test-board",
+  test("should preserve active edits during polling and keep DB consistent", async ({
+    authenticatedPage,
+    testContext,
+    testPrisma,
+    browser,
+  }) => {
+    const board = await testPrisma.board.create({
+      data: {
+        name: testContext.getBoardName("Realtime Preserve"),
+        description: testContext.prefix("Preserve edits board"),
+        createdBy: testContext.userId,
+        organizationId: testContext.organizationId,
+      },
     });
-    store.add(existingNote);
 
-    const context1 = await browser.newContext();
+    const note = await testPrisma.note.create({
+      data: {
+        content: "Original content",
+        color: "#fef3c7",
+        boardId: board.id,
+        createdBy: testContext.userId,
+      },
+    });
+
+    const { secondSessionToken } = await createSecondUserSession(testPrisma, testContext);
     const context2 = await browser.newContext();
-
-    const page1 = await context1.newPage();
+    await context2.addCookies([
+      {
+        name: "authjs.session-token",
+        value: secondSessionToken,
+        domain: "localhost",
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+      },
+    ]);
     const page2 = await context2.newPage();
 
-    await setupMockRoutes(page1, "user-1");
-    await setupMockRoutes(page2, "user-2");
+    await authenticatedPage.goto(`/boards/${board.id}`);
+    await page2.goto(`/boards/${board.id}`);
 
-    await page1.goto("/boards/test-board");
-    await page2.goto("/boards/test-board");
+    // Start editing locally on page1
+    await authenticatedPage.getByText("Original content").click();
+    const editArea = authenticatedPage.locator("textarea").first();
+    await expect(editArea).toBeVisible();
+    await editArea.fill("Local editing draft");
 
-    await page1.waitForTimeout(2000);
-    await page2.waitForTimeout(2000);
-
-    await page2.evaluate((id) => {
-      fetch(`/api/boards/test-board/notes/${id}`, {
+    // Update content from page2 via API (simulating another user's change)
+    const putResp = page2.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/${note.id}`) &&
+        resp.request().method() === "PUT" &&
+        resp.ok()
+    );
+    await page2.evaluate(({ boardId, id }) => {
+      return fetch(`/api/boards/${boardId}/notes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: "User 2 updated content" }),
       });
-    }, existingNote.id);
+    }, { boardId: board.id, id: note.id });
+    await putResp;
 
-    await page2.waitForTimeout(1000);
+    // DB should reflect user2's update
+    const dbNote = await testPrisma.note.findUnique({ where: { id: note.id } });
+    expect(dbNote?.content).toBe("User 2 updated content");
 
-    // ensure store updated
-    expect(store.all().find((n) => n.id === existingNote.id)?.content).toBe(
-      "User 2 updated content"
-    );
+    // While editing, page1 should still show the local draft
+    await expect(editArea).toHaveValue("Local editing draft");
 
-    await expect.poll(async () => await page1.locator(".note-background").count()).toBe(1);
-    await expect.poll(async () => await page2.locator(".note-background").count()).toBe(1);
-
-    await context1.close();
     await context2.close();
   });
 
-  test("should sync note deletions across sessions", async ({ browser }) => {
-    const note1 = createMockNote({
-      content: "Note to keep",
-      userId: "user-1",
-      boardId: "test-board",
+  test("should sync note deletions across sessions and soft-delete in DB", async ({
+    authenticatedPage,
+    testContext,
+    testPrisma,
+    browser,
+  }) => {
+    const board = await testPrisma.board.create({
+      data: {
+        name: testContext.getBoardName("Realtime Delete"),
+        description: testContext.prefix("Deletion board"),
+        createdBy: testContext.userId,
+        organizationId: testContext.organizationId,
+      },
     });
-    const note2 = createMockNote({
-      content: "Note to delete",
-      userId: "user-1",
-      boardId: "test-board",
-    });
-    store.add(note1);
-    store.add(note2);
 
-    const context1 = await browser.newContext();
+    const keepNote = await testPrisma.note.create({
+      data: {
+        content: testContext.prefix("Note to keep"),
+        color: "#fef3c7",
+        boardId: board.id,
+        createdBy: testContext.userId,
+      },
+    });
+    const deleteNote = await testPrisma.note.create({
+      data: {
+        content: testContext.prefix("Note to delete"),
+        color: "#fef3c7",
+        boardId: board.id,
+        createdBy: testContext.userId,
+      },
+    });
+
+    const { secondSessionToken } = await createSecondUserSession(testPrisma, testContext);
     const context2 = await browser.newContext();
-
-    const page1 = await context1.newPage();
+    await context2.addCookies([
+      {
+        name: "authjs.session-token",
+        value: secondSessionToken,
+        domain: "localhost",
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: "Lax",
+      },
+    ]);
     const page2 = await context2.newPage();
 
-    await setupMockRoutes(page1, "user-1");
-    await setupMockRoutes(page2, "user-2");
+    await authenticatedPage.goto(`/boards/${board.id}`);
+    await page2.goto(`/boards/${board.id}`);
 
-    await page1.goto("/boards/test-board");
-    await page2.goto("/boards/test-board");
+    // Hover to reveal delete button and delete on page1
+    await authenticatedPage.locator(`text=${deleteNote.content}`).hover();
+    const deleteButton = authenticatedPage.getByRole("button", { name: `Delete Note ${deleteNote.id}`, exact: true });
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
 
-    await page1.waitForTimeout(1000);
-    await page2.waitForTimeout(1000);
+    // The UI waits ~4s before issuing DELETE; wait for the DELETE to occur
+    await authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/${deleteNote.id}`) &&
+        resp.request().method() === "DELETE",
+      { timeout: 7000 }
+    );
 
-    expect(store.all().length).toBe(2);
+    const softDeleted = await testPrisma.note.findUnique({ where: { id: deleteNote.id } });
+    expect(softDeleted?.deletedAt).toBeTruthy();
 
-    await page1.evaluate((id) => {
-      fetch(`/api/boards/test-board/notes/${id}`, {
-        method: "DELETE",
-      });
-    }, note2.id);
+    const keepNoteDb = await testPrisma.note.findUnique({ where: { id: keepNote.id } });
+    expect(keepNoteDb?.deletedAt).toBeNull();
 
-    await page1.waitForTimeout(1000);
+    // After polling, both sessions should show only one note
+    await expect
+      .poll(async () => await authenticatedPage.locator(".note-background").count())
+      .toBe(1);
+    await expect
+      .poll(async () => await page2.locator(".note-background").count())
+      .toBe(1);
 
-    expect(store.all().length).toBe(1);
-    expect(store.all()[0].content).toBe("Note to keep");
-
-    await expect.poll(async () => await page1.locator(".note-background").count()).toBe(1);
-    await expect.poll(async () => await page2.locator(".note-background").count()).toBe(1);
-
-    await context1.close();
     await context2.close();
   });
 });
