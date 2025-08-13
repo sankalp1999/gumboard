@@ -67,9 +67,8 @@ export function usePolling<T = unknown>({
         Pragma: "no-cache",
       };
 
-
       // First check if data changed
-      const checkResponse = await fetch(`${url}${url.includes('?') ? '&' : '?'}check=true`, {
+      const checkResponse = await fetch(`${url}${url.includes("?") ? "&" : "?"}check=true`, {
         signal: abortControllerRef.current.signal,
         headers,
         credentials: "same-origin",
@@ -77,21 +76,21 @@ export function usePolling<T = unknown>({
 
       if (checkResponse.ok) {
         const { lastModified } = await checkResponse.json();
-        
+
         // If timestamp hasn't changed, skip full fetch
         if (lastModified === lastTimestampRef.current) {
           retryCountRef.current = 0;
           setError(null);
           return;
         }
-        
+
         // Timestamp changed, fetch full data
         const fullResponse = await fetch(url, {
           signal: abortControllerRef.current.signal,
           headers,
           credentials: "same-origin",
         });
-        
+
         if (fullResponse.ok) {
           const data = await fullResponse.json();
           lastTimestampRef.current = lastModified;
@@ -103,7 +102,7 @@ export function usePolling<T = unknown>({
       } else {
         throw new Error(`HTTP ${checkResponse.status}`);
       }
-        
+
       retryCountRef.current = 0;
       setError(null);
     } catch (error) {

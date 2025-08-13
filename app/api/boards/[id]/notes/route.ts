@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { searchParams } = new URL(request.url);
-    const isCheckOnly = searchParams.get('check') === 'true';
+    const isCheckOnly = searchParams.get("check") === "true";
 
     // If check-only, return just timestamp
     if (isCheckOnly) {
@@ -77,9 +77,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         board?.updatedAt,
       ].filter(Boolean) as Date[];
 
-      const lastModified = timestamps.length > 0 
-        ? new Date(Math.max(...timestamps.map(t => t.getTime()))).toISOString()
-        : null;
+      const lastModified =
+        timestamps.length > 0
+          ? new Date(Math.max(...timestamps.map((t) => t.getTime()))).toISOString()
+          : null;
 
       return NextResponse.json({ lastModified });
     }

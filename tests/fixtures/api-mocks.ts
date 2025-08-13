@@ -117,8 +117,8 @@ export async function mockBoardNotes(page: Page, boardId: string, store: SharedN
     const req = route.request();
     if (req.method() === "GET") {
       const url = new URL(req.url());
-      const isCheckOnly = url.searchParams.get('check') === 'true';
-      
+      const isCheckOnly = url.searchParams.get("check") === "true";
+
       if (isCheckOnly) {
         const lastModified = store.lastModified();
         return route.fulfill({
@@ -127,7 +127,7 @@ export async function mockBoardNotes(page: Page, boardId: string, store: SharedN
           body: JSON.stringify({ lastModified }),
         });
       }
-      
+
       return route.fulfill({
         status: 200,
         contentType: "application/json",
