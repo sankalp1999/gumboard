@@ -15,6 +15,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
         email: secondEmail,
         name: `User Two ${testContext.testId}`,
         organizationId: testContext.organizationId,
+        isAdmin: true,
       },
     });
 
@@ -46,7 +47,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
 
     const note = await testPrisma.note.create({
       data: {
-        content: "",
         color: "#fef3c7",
         boardId: board.id,
         createdBy: testContext.userId,
@@ -71,7 +71,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    // Add a checklist item on page 1
     await authenticatedPage.getByRole("button", { name: "Add task" }).first().click();
     const itemContent = testContext.prefix("First item");
     const addItemResponse = authenticatedPage.waitForResponse(
@@ -84,7 +83,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.getByPlaceholder("Add new item...").press("Enter");
     await addItemResponse;
 
-    // DB should have one checklist item
     const updatedNoteAfterAdd = await testPrisma.note.findUnique({
       where: { id: note.id },
       include: { checklistItems: true },
@@ -93,13 +91,18 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const createdItem = updatedNoteAfterAdd!.checklistItems[0];
     expect(createdItem.content).toBe(itemContent);
 
-    // Page 2 should reflect the item after polling
     await expect
       .poll(async () => await page2.getByTestId(createdItem.id).count())
       .toBe(1);
 
-    // Toggle completion on page 1 and verify DB + page 2
+    const toggleResponse = authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/${note.id}`) &&
+        resp.request().method() === "PUT" &&
+        resp.ok()
+    );
     await authenticatedPage.getByTestId(createdItem.id).getByRole("checkbox", { disabled: false }).click();
+    await toggleResponse;
 
     const toggledInDb = await testPrisma.checklistItem.findUnique({ where: { id: createdItem.id } });
     expect(toggledInDb?.checked).toBe(true);
@@ -113,7 +116,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
       )
       .toBe("checked");
 
-    // Edit content on page 1 and verify DB + page 2
     await authenticatedPage.getByTestId(createdItem.id).getByText(itemContent).click();
     const editInput = authenticatedPage.getByTestId(createdItem.id).getByRole("textbox").first();
     const editedContent = testContext.prefix("First item edited");
@@ -170,7 +172,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    // Create first note from user1
     const createNoteResp1 = authenticatedPage.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${board.id}/notes`) &&
@@ -183,7 +184,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const notesAfterFirst = await testPrisma.note.findMany({ where: { boardId: board.id } });
     expect(notesAfterFirst).toHaveLength(1);
 
-    // Create second note from user2
     const createNoteResp2 = page2.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${board.id}/notes`) &&
@@ -196,7 +196,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const notesAfterSecond = await testPrisma.note.findMany({ where: { boardId: board.id } });
     expect(notesAfterSecond).toHaveLength(2);
 
-    // Page1 should observe the new note after polling
     await expect
       .poll(async () => await authenticatedPage.locator(".note-background").count())
       .toBe(2);
@@ -221,10 +220,18 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
 
     const note = await testPrisma.note.create({
       data: {
-        content: "Original content",
         color: "#fef3c7",
         boardId: board.id,
         createdBy: testContext.userId,
+        checklistItems: {
+          create: [
+            {
+              content: "Original content",
+              checked: false,
+              order: 0,
+            },
+          ],
+        },
       },
     });
 
@@ -246,33 +253,39 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    // Start editing locally on page1
     await authenticatedPage.getByText("Original content").click();
-    const editArea = authenticatedPage.locator("textarea").first();
+    const editArea = authenticatedPage.locator('input[type="text"]').first();
     await expect(editArea).toBeVisible();
     await editArea.fill("Local editing draft");
 
-    // Update content from page2 via API (simulating another user's change)
+    const noteChecklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
     const putResp = page2.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${board.id}/notes/${note.id}`) &&
         resp.request().method() === "PUT" &&
         resp.ok()
     );
-    await page2.evaluate(({ boardId, id }) => {
+    await page2.evaluate(({ boardId, id, itemId }) => {
       return fetch(`/api/boards/${boardId}/notes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "User 2 updated content" }),
+        body: JSON.stringify({
+          checklistItems: [
+            {
+              id: itemId,
+              content: "User 2 updated content",
+              checked: false,
+              order: 0,
+            },
+          ],
+        }),
       });
-    }, { boardId: board.id, id: note.id });
+    }, { boardId: board.id, id: note.id, itemId: noteChecklistItem?.id });
     await putResp;
 
-    // DB should reflect user2's update
-    const dbNote = await testPrisma.note.findUnique({ where: { id: note.id } });
-    expect(dbNote?.content).toBe("User 2 updated content");
+    const dbChecklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
+    expect(dbChecklistItem?.content).toBe("User 2 updated content");
 
-    // While editing, page1 should still show the local draft
     await expect(editArea).toHaveValue("Local editing draft");
 
     await context2.close();
@@ -295,18 +308,34 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
 
     const keepNote = await testPrisma.note.create({
       data: {
-        content: testContext.prefix("Note to keep"),
         color: "#fef3c7",
         boardId: board.id,
         createdBy: testContext.userId,
+        checklistItems: {
+          create: [
+            {
+              content: testContext.prefix("Note to keep"),
+              checked: false,
+              order: 0,
+            },
+          ],
+        },
       },
     });
     const deleteNote = await testPrisma.note.create({
       data: {
-        content: testContext.prefix("Note to delete"),
         color: "#fef3c7",
         boardId: board.id,
         createdBy: testContext.userId,
+        checklistItems: {
+          create: [
+            {
+              content: testContext.prefix("Note to delete"),
+              checked: false,
+              order: 0,
+            },
+          ],
+        },
       },
     });
 
@@ -328,13 +357,12 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    // Hover to reveal delete button and delete on page1
-    await authenticatedPage.locator(`text=${deleteNote.content}`).hover();
+    const deleteNoteChecklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: deleteNote.id } });
+    await authenticatedPage.locator(`text=${deleteNoteChecklistItem?.content}`).hover();
     const deleteButton = authenticatedPage.getByRole("button", { name: `Delete Note ${deleteNote.id}`, exact: true });
     await expect(deleteButton).toBeVisible();
     await deleteButton.click();
 
-    // The UI waits ~4s before issuing DELETE; wait for the DELETE to occur
     await authenticatedPage.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${board.id}/notes/${deleteNote.id}`) &&
@@ -348,7 +376,6 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const keepNoteDb = await testPrisma.note.findUnique({ where: { id: keepNote.id } });
     expect(keepNoteDb?.deletedAt).toBeNull();
 
-    // After polling, both sessions should show only one note
     await expect
       .poll(async () => await authenticatedPage.locator(".note-background").count())
       .toBe(1);
@@ -357,5 +384,140 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
       .toBe(1);
 
     await context2.close();
+  });
+
+  test("should return updated timestamps when data changes", async ({
+    authenticatedPage,
+    testContext,
+    testPrisma,
+  }) => {
+    const board = await testPrisma.board.create({
+      data: {
+        name: testContext.getBoardName("Timestamp Test"),
+        description: testContext.prefix("Timestamp test"),
+        createdBy: testContext.userId,
+        organizationId: testContext.organizationId,
+      },
+    });
+
+    const note = await testPrisma.note.create({
+      data: {
+        color: "#fef3c7",
+        boardId: board.id,
+        createdBy: testContext.userId,
+        checklistItems: {
+          create: [{ content: "Test item", checked: false, order: 0 }],
+        },
+      },
+    });
+
+    await authenticatedPage.goto(`/boards/${board.id}`);
+
+    const initialResponse = await authenticatedPage.request.get(`/api/boards/${board.id}/notes?check=true`);
+    const initialData = await initialResponse.json();
+    const initialTimestamp = initialData.lastModified;
+
+    await authenticatedPage.waitForTimeout(10);
+
+    const checklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
+    
+    await authenticatedPage.getByTestId(checklistItem!.id).getByText("Test item").click();
+    const editInput = authenticatedPage.getByTestId(checklistItem!.id).getByRole("textbox").first();
+    await expect(editInput).toBeVisible();
+    await expect(editInput).toHaveValue("Test item");
+    
+    const updateResponse = authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/`) &&
+        resp.request().method() === "PUT" &&
+        resp.ok()
+    );
+    
+    await editInput.fill("Updated test item");
+    await authenticatedPage.click("body");
+    await updateResponse;
+
+    const updatedResponse = await authenticatedPage.request.get(`/api/boards/${board.id}/notes?check=true`);
+    const updatedData = await updatedResponse.json();
+    const updatedTimestamp = updatedData.lastModified;
+
+    const dbItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
+    expect(dbItem?.content).toBe("Updated test item");
+    
+    expect(updatedTimestamp).toBeTruthy();
+    if (initialTimestamp) {
+      expect(new Date(updatedTimestamp).getTime()).toBeGreaterThan(new Date(initialTimestamp).getTime());
+    }
+  });
+
+  test("should verify polling mechanism works correctly", async ({
+    authenticatedPage,
+    testContext,
+    testPrisma,
+  }) => {
+    const board = await testPrisma.board.create({
+      data: {
+        name: testContext.getBoardName("Polling Test"),
+        description: testContext.prefix("Polling test"),
+        createdBy: testContext.userId,
+        organizationId: testContext.organizationId,
+      },
+    });
+
+    await testPrisma.note.create({
+      data: {
+        color: "#fef3c7",
+        boardId: board.id,
+        createdBy: testContext.userId,
+        checklistItems: {
+          create: [{ content: "Polling item", checked: false, order: 0 }],
+        },
+      },
+    });
+
+    const pollRequests: { timestamp: number; hasChanged: boolean }[] = [];
+    
+    await authenticatedPage.route(`**/api/boards/${board.id}/notes?check=true`, async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      pollRequests.push({
+        timestamp: Date.now(),
+        hasChanged: !!data.lastModified
+      });
+      await route.fulfill({ response });
+    });
+
+    await authenticatedPage.goto(`/boards/${board.id}`);
+    
+    await authenticatedPage.waitForTimeout(6000);
+    
+    const initialPollCount = pollRequests.length;
+    expect(initialPollCount).toBeGreaterThan(0);
+    
+    await authenticatedPage.getByText("Polling item").click();
+    const editInput = authenticatedPage.getByRole("textbox").first();
+    await expect(editInput).toBeVisible();
+    
+    const updateResponse = authenticatedPage.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/boards/${board.id}/notes/`) &&
+        resp.request().method() === "PUT" &&
+        resp.ok()
+    );
+    
+    await editInput.fill("Updated polling item");
+    await authenticatedPage.click("body");
+    await updateResponse;
+    
+    await authenticatedPage.waitForTimeout(5000);
+    
+    const finalPollCount = pollRequests.length;
+    expect(finalPollCount).toBeGreaterThan(initialPollCount);
+    
+    for (let i = 1; i < pollRequests.length; i++) {
+      const interval = pollRequests[i].timestamp - pollRequests[i - 1].timestamp;
+      expect(interval).toBeGreaterThan(500);
+      expect(interval).toBeLessThan(15000);
+    }
   });
 });
