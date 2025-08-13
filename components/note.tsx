@@ -68,8 +68,6 @@ interface NoteProps {
   showBoardName?: boolean;
   className?: string;
   style?: React.CSSProperties;
-  onStartNoteEdit?: (noteId: string) => void;
-  onStopNoteEdit?: () => void;
 }
 
 export function Note({
@@ -85,8 +83,6 @@ export function Note({
   className,
   syncDB = true,
   style,
-  onStartNoteEdit,
-  onStopNoteEdit,
 }: NoteProps) {
   const { resolvedTheme } = useTheme();
 

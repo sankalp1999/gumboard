@@ -55,7 +55,6 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   });
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [addingChecklistItem, setAddingChecklistItem] = useState<string | null>(null);
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   // Per-item edit and animations are handled inside Note component now
   const [errorDialog, setErrorDialog] = useState<{
     open: boolean;
@@ -84,18 +83,9 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     onUpdate: useCallback(
       (data: { notes: Note[] }) => {
         const incoming = data.notes.filter((n) => !pendingLocalDeleteIdsRef.current.has(n.id));
-        setNotes((prevNotes) => {
-          const currentEditingId = editingNoteId;
-          const prevMap = new Map(prevNotes.map((n) => [n.id, n]));
-          return incoming.map((newNote) => {
-            if (currentEditingId && newNote.id === currentEditingId) {
-              return prevMap.get(newNote.id) ?? newNote;
-            }
-            return newNote;
-          });
-        });
+        setNotes(incoming);
       },
-      [editingNoteId]
+      []
     ),
   });
 
@@ -1164,8 +1154,6 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
               onArchive={boardId !== "archive" ? handleArchiveNote : undefined}
               onUnarchive={boardId === "archive" ? handleUnarchiveNote : undefined}
               showBoardName={boardId === "all-notes" || boardId === "archive"}
-              onStartNoteEdit={() => setEditingNoteId(note.id)}
-              onStopNoteEdit={() => setEditingNoteId(null)}
               className="note-background"
               style={{
                 position: "absolute",
