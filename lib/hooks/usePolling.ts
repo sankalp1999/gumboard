@@ -30,7 +30,6 @@ export function usePolling<T = unknown>({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTabActiveRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const lastDataRef = useRef<string | null>(null);
   const lastActivityRef = useRef(Date.now());
   const lastTimestampRef = useRef<string | null>(null);
   const retryCountRef = useRef(0);
@@ -97,10 +96,10 @@ export function usePolling<T = unknown>({
           setLastSync(new Date());
           onUpdate?.(data);
         } else {
-          throw new Error(`HTTP ${fullResponse.status}`);
+          throw new Error(`Client error: ${fullResponse.status}`);
         }
       } else {
-        throw new Error(`HTTP ${checkResponse.status}`);
+        throw new Error(`Client error: ${checkResponse.status}`);
       }
 
       retryCountRef.current = 0;
@@ -146,7 +145,6 @@ export function usePolling<T = unknown>({
         abortControllerRef.current = null;
       }
       lastTimestampRef.current = null;
-      lastDataRef.current = null;
       retryCountRef.current = 0;
       setError(null);
       lastUrlRef.current = url;
