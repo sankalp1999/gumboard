@@ -77,12 +77,11 @@ export function createSharedNotesStore(initial: any[] = []) {
     remove: (id: string) => {
       notes = notes.filter((n) => n.id !== id);
     },
-    etag: () => {
-      const count = notes.length;
+    lastModified: () => {
       const latest = notes.reduce<string | undefined>((acc, n) => {
         return !acc || new Date(n.updatedAt) > new Date(acc) ? n.updatedAt : acc;
       }, undefined);
-      return `${count}-${latest ?? "empty"}`;
+      return latest || null;
     },
   };
 }
@@ -117,15 +116,21 @@ export async function mockBoardNotes(page: Page, boardId: string, store: SharedN
   await page.route(`**/api/boards/${boardId}/notes`, async (route) => {
     const req = route.request();
     if (req.method() === "GET") {
-      const ifNoneMatch = req.headers()["if-none-match"];
-      const etag = store.etag();
-      if (ifNoneMatch === etag) {
-        return route.fulfill({ status: 304, headers: { ETag: etag } });
+      const url = new URL(req.url());
+      const isCheckOnly = url.searchParams.get('check') === 'true';
+      
+      if (isCheckOnly) {
+        const lastModified = store.lastModified();
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ lastModified }),
+        });
       }
+      
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        headers: { ETag: etag },
         body: JSON.stringify({ notes: store.all() }),
       });
     }

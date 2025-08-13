@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { NOTE_COLORS } from "@/lib/constants";
-import { checkEtagMatch, createEtagResponse } from "@/lib/etag";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,54 +19,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No organization found" }, { status: 403 });
     }
 
-    const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
-      db.note.findFirst({
-        where: {
-          deletedAt: null,
-          archivedAt: null,
-          board: { organizationId: user.organizationId },
-        },
-        orderBy: { updatedAt: "desc" },
-        select: { updatedAt: true },
-      }),
-      db.note.count({
-        where: {
-          deletedAt: null,
-          archivedAt: null,
-          board: { organizationId: user.organizationId },
-        },
-      }),
-      db.checklistItem.findFirst({
-        where: {
-          note: {
+    const { searchParams } = new URL(request.url);
+    const isCheckOnly = searchParams.get('check') === 'true';
+
+    // If check-only, return just timestamp
+    if (isCheckOnly) {
+      const [latestNote, latestChecklistItem] = await Promise.all([
+        db.note.findFirst({
+          where: {
             deletedAt: null,
             archivedAt: null,
             board: { organizationId: user.organizationId },
           },
-        },
-        orderBy: { updatedAt: "desc" },
-        select: { updatedAt: true },
-      }),
-      db.checklistItem.count({
-        where: {
-          note: {
-            deletedAt: null,
-            archivedAt: null,
-            board: { organizationId: user.organizationId },
+          orderBy: { updatedAt: "desc" },
+          select: { updatedAt: true },
+        }),
+        db.checklistItem.findFirst({
+          where: {
+            note: {
+              deletedAt: null,
+              archivedAt: null,
+              board: { organizationId: user.organizationId },
+            },
           },
-        },
-      }),
-    ]);
+          orderBy: { updatedAt: "desc" },
+          select: { updatedAt: true },
+        }),
+      ]);
 
-    const etag = [
-      noteCount,
-      latestNote?.updatedAt?.toISOString() || "empty",
-      checklistItemCount,
-      latestChecklistItem?.updatedAt?.toISOString() || "empty",
-    ].join("-");
+      const timestamps = [
+        latestNote?.updatedAt,
+        latestChecklistItem?.updatedAt,
+      ].filter(Boolean) as Date[];
 
-    const etagMatch = checkEtagMatch(request, etag);
-    if (etagMatch) return etagMatch;
+      const lastModified = timestamps.length > 0 
+        ? new Date(Math.max(...timestamps.map(t => t.getTime()))).toISOString()
+        : null;
+
+      return NextResponse.json({ lastModified });
+    }
 
     const notes = await db.note.findMany({
       where: {
@@ -98,7 +88,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return createEtagResponse({ notes }, etag);
+    return NextResponse.json({ notes });
   } catch (error) {
     console.error("Error fetching global notes:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

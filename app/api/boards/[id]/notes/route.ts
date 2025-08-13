@@ -8,7 +8,6 @@ import {
   shouldSendNotification,
 } from "@/lib/slack";
 import { NOTE_COLORS } from "@/lib/constants";
-import { checkEtagMatch, createEtagResponse } from "@/lib/etag";
 
 // Get all notes for a board
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -50,38 +49,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // ETag incorporates notes and checklist items
-    const [latestNote, noteCount, latestChecklistItem, checklistItemCount] = await Promise.all([
-      db.note.findFirst({
-        where: { boardId, deletedAt: null, archivedAt: null },
-        orderBy: { updatedAt: "desc" },
-        select: { updatedAt: true },
-      }),
-      db.note.count({
-        where: { boardId, deletedAt: null, archivedAt: null },
-      }),
-      db.checklistItem.findFirst({
-        where: { note: { boardId, deletedAt: null, archivedAt: null } },
-        orderBy: { updatedAt: "desc" },
-        select: { updatedAt: true },
-      }),
-      db.checklistItem.count({
-        where: { note: { boardId, deletedAt: null, archivedAt: null } },
-      }),
-    ]);
+    const { searchParams } = new URL(request.url);
+    const isCheckOnly = searchParams.get('check') === 'true';
 
-    const etag = [
-      noteCount,
-      latestNote?.updatedAt?.toISOString() || "empty",
-      checklistItemCount,
-      latestChecklistItem?.updatedAt?.toISOString() || "empty",
-    ].join("-");
+    // If check-only, return just timestamp
+    if (isCheckOnly) {
+      const [latestNote, latestChecklistItem] = await Promise.all([
+        db.note.findFirst({
+          where: { boardId, deletedAt: null, archivedAt: null },
+          orderBy: { updatedAt: "desc" },
+          select: { updatedAt: true },
+        }),
+        db.checklistItem.findFirst({
+          where: { note: { boardId, deletedAt: null, archivedAt: null } },
+          orderBy: { updatedAt: "desc" },
+          select: { updatedAt: true },
+        }),
+      ]);
 
-    // Check if client has matching ETag
-    const etagMatch = checkEtagMatch(request, etag);
-    if (etagMatch) return etagMatch;
+      const timestamps = [
+        latestNote?.updatedAt,
+        latestChecklistItem?.updatedAt,
+      ].filter(Boolean) as Date[];
 
-    // Only fetch full notes if ETag doesn't match
+      const lastModified = timestamps.length > 0 
+        ? new Date(Math.max(...timestamps.map(t => t.getTime()))).toISOString()
+        : null;
+
+      return NextResponse.json({ lastModified });
+    }
     const notes = await db.note.findMany({
       where: { boardId, deletedAt: null, archivedAt: null },
       select: {
@@ -105,7 +101,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       orderBy: { createdAt: "desc" },
     });
 
-    return createEtagResponse({ notes }, etag);
+    return NextResponse.json({ notes });
   } catch (error) {
     console.error("Error fetching notes:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

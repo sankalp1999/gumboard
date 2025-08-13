@@ -32,7 +32,7 @@ export function usePolling<T = unknown>({
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastDataRef = useRef<string | null>(null);
   const lastActivityRef = useRef(Date.now());
-  const etagRef = useRef<string | null>(null);
+  const lastTimestampRef = useRef<string | null>(null);
   const retryCountRef = useRef(0);
   const lastUrlRef = useRef(url);
   const isFetchingRef = useRef(false);
@@ -67,45 +67,45 @@ export function usePolling<T = unknown>({
         Pragma: "no-cache",
       };
 
-      if (etagRef.current) {
-        headers["If-None-Match"] = etagRef.current;
-      }
 
-      const response = await fetch(url, {
+      // First check if data changed
+      const checkResponse = await fetch(`${url}${url.includes('?') ? '&' : '?'}check=true`, {
         signal: abortControllerRef.current.signal,
         headers,
         credentials: "same-origin",
       });
 
-      if (response.status === 304) {
-        retryCountRef.current = 0;
-        setError(null);
-        return;
-      }
-
-      if (response.ok) {
-        const newEtag = response.headers.get("ETag");
-        if (newEtag) {
-          etagRef.current = newEtag;
+      if (checkResponse.ok) {
+        const { lastModified } = await checkResponse.json();
+        
+        // If timestamp hasn't changed, skip full fetch
+        if (lastModified === lastTimestampRef.current) {
+          retryCountRef.current = 0;
+          setError(null);
+          return;
         }
-
-        const data = await response.json();
-        const dataStr = JSON.stringify(data);
-
-        if (dataStr !== lastDataRef.current) {
-          lastDataRef.current = dataStr;
+        
+        // Timestamp changed, fetch full data
+        const fullResponse = await fetch(url, {
+          signal: abortControllerRef.current.signal,
+          headers,
+          credentials: "same-origin",
+        });
+        
+        if (fullResponse.ok) {
+          const data = await fullResponse.json();
+          lastTimestampRef.current = lastModified;
           setLastSync(new Date());
           onUpdate?.(data);
+        } else {
+          throw new Error(`HTTP ${fullResponse.status}`);
         }
-
-        retryCountRef.current = 0;
-        setError(null);
-      } else if (response.status >= 400 && response.status < 500) {
-        setError(`Client error: ${response.status}`);
-        retryCountRef.current = 0;
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`HTTP ${checkResponse.status}`);
       }
+        
+      retryCountRef.current = 0;
+      setError(null);
     } catch (error) {
       if (error instanceof Error && error.name !== "AbortError") {
         if (retryCountRef.current < MAX_RETRY_ATTEMPTS) {
@@ -146,7 +146,7 @@ export function usePolling<T = unknown>({
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      etagRef.current = null;
+      lastTimestampRef.current = null;
       lastDataRef.current = null;
       retryCountRef.current = 0;
       setError(null);
