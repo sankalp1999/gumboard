@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     // If check-only, return just timestamp
     if (isCheckOnly) {
-      const [latestNote, latestChecklistItem] = await Promise.all([
+      const [latestNote, latestChecklistItem, latestBoard] = await Promise.all([
         db.note.findFirst({
           where: {
             deletedAt: null,
@@ -45,11 +45,17 @@ export async function GET(request: NextRequest) {
           orderBy: { updatedAt: "desc" },
           select: { updatedAt: true },
         }),
+        db.board.findFirst({
+          where: { organizationId: user.organizationId },
+          orderBy: { updatedAt: "desc" },
+          select: { updatedAt: true },
+        }),
       ]);
 
       const timestamps = [
         latestNote?.updatedAt,
         latestChecklistItem?.updatedAt,
+        latestBoard?.updatedAt,
       ].filter(Boolean) as Date[];
 
       const lastModified = timestamps.length > 0 
