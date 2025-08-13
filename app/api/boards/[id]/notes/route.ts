@@ -22,30 +22,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         id: true,
         isPublic: true,
         organizationId: true,
-        notes: {
-          where: {
-            deletedAt: null, // Only include non-deleted notes
-            archivedAt: null,
-          },
-          select: {
-            id: true,
-            color: true,
-            boardId: true,
-            createdBy: true,
-            createdAt: true,
-            updatedAt: true,
-            archivedAt: true,
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            checklistItems: { orderBy: { order: "asc" } },
-          },
-          orderBy: { createdAt: "desc" },
-        },
       },
     });
 
@@ -112,7 +88,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: { boardId, deletedAt: null, archivedAt: null },
       select: {
         id: true,
-        content: true,
         color: true,
         boardId: true,
         createdBy: true,
