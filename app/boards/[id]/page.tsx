@@ -80,13 +80,10 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     boardId,
     enabled: !loading && !!boardId,
     pollingInterval: 4000,
-    onUpdate: useCallback(
-      (data: { notes: Note[] }) => {
-        const incoming = data.notes.filter((n) => !pendingLocalDeleteIdsRef.current.has(n.id));
-        setNotes(incoming);
-      },
-      []
-    ),
+    onUpdate: useCallback((data: { notes: Note[] }) => {
+      const incoming = data.notes.filter((n) => !pendingLocalDeleteIdsRef.current.has(n.id));
+      setNotes(incoming);
+    }, []),
   });
 
   useEffect(() => {
