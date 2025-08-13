@@ -27,8 +27,6 @@ export async function GET(request: NextRequest) {
       const [latestNote, latestChecklistItem, latestBoard] = await Promise.all([
         db.note.findFirst({
           where: {
-            deletedAt: null,
-            archivedAt: null,
             board: { organizationId: user.organizationId },
           },
           orderBy: { updatedAt: "desc" },
@@ -37,8 +35,6 @@ export async function GET(request: NextRequest) {
         db.checklistItem.findFirst({
           where: {
             note: {
-              deletedAt: null,
-              archivedAt: null,
               board: { organizationId: user.organizationId },
             },
           },

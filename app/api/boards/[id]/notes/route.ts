@@ -56,12 +56,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (isCheckOnly) {
       const [latestNote, latestChecklistItem, board] = await Promise.all([
         db.note.findFirst({
-          where: { boardId, deletedAt: null, archivedAt: null },
+          where: { boardId },
           orderBy: { updatedAt: "desc" },
           select: { updatedAt: true },
         }),
         db.checklistItem.findFirst({
-          where: { note: { boardId, deletedAt: null, archivedAt: null } },
+          where: { note: { boardId } },
           orderBy: { updatedAt: "desc" },
           select: { updatedAt: true },
         }),
