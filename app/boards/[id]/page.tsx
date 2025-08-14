@@ -77,10 +77,9 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const router = useRouter();
   const searchParams = useSearchParams();
 
-<<<<<<< HEAD
   const { error: pollingError } = useBoardNotesPolling({
     boardId,
-    enabled: !loading && !!boardId,
+    enabled: !notesloading && !!boardId,
     pollingInterval: 4000,
     onUpdate: useCallback((data: { notes: Note[] }) => {
       const incoming = data.notes.filter((n) => !pendingLocalDeleteIdsRef.current.has(n.id));
@@ -93,13 +92,12 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       router.push("/auth/signin");
     }
   }, [pollingError, router]);
-=======
+
   useEffect(() => {
     if (!userLoading && !user) {
       router.push("/auth/signin");
     }
   }, [user, userLoading, router]);
->>>>>>> origin/main
 
   // Update URL with current filter state
   const updateURL = (
