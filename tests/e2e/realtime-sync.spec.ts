@@ -196,7 +196,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     expect(notesAfterSecond).toHaveLength(2);
 
     await expect
-      .poll(async () => await authenticatedPage.locator(".note-background").count())
+      .poll(async () => await authenticatedPage.locator(".rounded-lg.group.transition-all").count())
       .toBe(2);
 
     await context2.close();
@@ -365,9 +365,9 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     expect(keepNoteDb?.deletedAt).toBeNull();
 
     await expect
-      .poll(async () => await authenticatedPage.locator(".note-background").count())
+      .poll(async () => await authenticatedPage.locator(".rounded-lg.group.transition-all").count())
       .toBe(1);
-    await expect.poll(async () => await page2.locator(".note-background").count()).toBe(1);
+    await expect.poll(async () => await page2.locator(".rounded-lg.group.transition-all").count()).toBe(1);
 
     await context2.close();
   });
