@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const board = await db.board.findUnique({
       where: { id: boardId },
-      include: { organization: { include: { members: true } } },
+      include: { organization: true },
     });
 
     if (!board) {
@@ -34,9 +34,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Check if user is member of the organization
-    const isMember = board.organization.members.some((member) => member.id === session?.user?.id);
+    const userInOrg = await db.user.findFirst({
+      where: {
+        id: session.user.id,
+        organizationId: board.organizationId,
+      },
+    });
 
-    if (!isMember) {
+    if (!userInOrg) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
