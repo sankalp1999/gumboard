@@ -66,7 +66,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    await authenticatedPage.getByRole("button", { name: "Add task" }).first().click();
+    await authenticatedPage.getByRole("button", { name: "Add note" }).first().click();
     const itemContent = testContext.prefix("First item");
     const addItemResponse = authenticatedPage.waitForResponse(
       (resp) =>
@@ -172,7 +172,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    await authenticatedPage.getByRole("button", { name: "Add Your First Note" }).click();
+    await authenticatedPage.getByRole("button", { name: "Add note" }).click();
     await authenticatedPage.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${board.id}/notes`) &&
