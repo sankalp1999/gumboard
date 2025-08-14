@@ -66,7 +66,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await authenticatedPage.goto(`/boards/${board.id}`);
     await page2.goto(`/boards/${board.id}`);
 
-    await authenticatedPage.getByRole("button", { name: "Add note" }).first().click();
+    // Note already exists, interact with its textarea directly
     const itemContent = testContext.prefix("First item");
     const addItemResponse = authenticatedPage.waitForResponse(
       (resp) =>
@@ -74,8 +74,9 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
         resp.request().method() === "PUT" &&
         resp.ok()
     );
-    await authenticatedPage.getByPlaceholder("Add new item...").fill(itemContent);
-    await authenticatedPage.getByPlaceholder("Add new item...").press("Enter");
+    const newItemInput = authenticatedPage.getByTestId("new-item").locator("textarea");
+    await newItemInput.fill(itemContent);
+    await newItemInput.press("Enter");
     await addItemResponse;
 
     const updatedNoteAfterAdd = await testPrisma.note.findUnique({
@@ -115,7 +116,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
       .toBe("checked");
 
     await authenticatedPage.getByTestId(createdItem.id).getByText(itemContent).click();
-    const editInput = authenticatedPage.getByTestId(createdItem.id).getByRole("textbox").first();
+    const editInput = authenticatedPage.getByTestId(createdItem.id).locator("textarea").first();
     const editedContent = testContext.prefix("First item edited");
     const saveEditResponse = authenticatedPage.waitForResponse(
       (resp) =>
@@ -409,7 +410,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     const checklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
 
     await authenticatedPage.getByTestId(checklistItem!.id).getByText("Test item").click();
-    const editInput = authenticatedPage.getByTestId(checklistItem!.id).getByRole("textbox").first();
+    const editInput = authenticatedPage.getByTestId(checklistItem!.id).locator("textarea").first();
     await expect(editInput).toBeVisible();
     await expect(editInput).toHaveValue("Test item");
 
@@ -482,7 +483,7 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
 
     const checklistItem = await testPrisma.checklistItem.findFirst({ where: { noteId: note.id } });
     await authenticatedPage.getByTestId(checklistItem!.id).getByText("Polling item").click();
-    const editInput = authenticatedPage.getByTestId(checklistItem!.id).getByRole("textbox").first();
+    const editInput = authenticatedPage.getByTestId(checklistItem!.id).locator("textarea").first();
     await expect(editInput).toBeVisible();
 
     await editInput.fill("Updated polling item");
