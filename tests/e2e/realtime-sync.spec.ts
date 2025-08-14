@@ -367,7 +367,9 @@ test.describe("Real-time Synchronization (DB-backed)", () => {
     await expect
       .poll(async () => await authenticatedPage.locator(".rounded-lg.group.transition-all").count())
       .toBe(1);
-    await expect.poll(async () => await page2.locator(".rounded-lg.group.transition-all").count()).toBe(1);
+    await expect
+      .poll(async () => await page2.locator(".rounded-lg.group.transition-all").count())
+      .toBe(1);
 
     await context2.close();
   });
