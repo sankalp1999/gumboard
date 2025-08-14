@@ -64,6 +64,8 @@ model User {
   createdSelfServeInvites OrganizationSelfServeInvite[]
   notes          Note[]
 
+  @@index([organizationId], name: "idx_user_org")
+  @@index([organizationId, isAdmin], name: "idx_user_org_admin")
   @@map("users")
 }
 
