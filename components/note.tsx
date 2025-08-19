@@ -523,7 +523,7 @@ export function Note({
                 onCreateItem={handleCreateNewItem}
                 readonly={false}
                 showDeleteButton={false}
-                className="-mt-1"
+                className=""
               />
             )}
           </DraggableRoot>
