@@ -158,29 +158,34 @@ test.describe("Home Page", () => {
     expect(newItem).toBeTruthy();
     expect(newItem?.content).toBe(newItemContent);
 
-    // Test 4: Edit existing checklist item content
     const originalFinanceText = testContext.prefix("Finance update by Friday");
     const updatedFinanceText = testContext.prefix("Updated Finance deadline");
-    await authenticatedPage.getByText(originalFinanceText).click();
-    const editInput = authenticatedPage.locator("textarea").first();
+    const financeItemLocator = authenticatedPage.getByTestId(testContext.prefix("101"));
+    
+    await financeItemLocator.getByText(originalFinanceText).click();
+    const editInput = financeItemLocator.locator("textarea");
     await expect(editInput).toBeVisible();
+    
+    await editInput.clear();
+    await editInput.fill(updatedFinanceText);
+    
     const editResponse = authenticatedPage.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${demoBoard.id}/notes/`) &&
         resp.request().method() === "PUT" &&
         resp.ok()
     );
-    await editInput.fill(updatedFinanceText);
-    await editInput.blur(); // Use blur instead of Enter to save the edit
+    await editInput.press("Enter");
     await editResponse;
-    await expect(authenticatedPage.getByText(updatedFinanceText)).toBeVisible();
+    
+    await expect(financeItemLocator.getByText(updatedFinanceText)).toBeVisible();
 
-    // Verify edit was saved to database
-    const editedItem = await testPrisma.checklistItem.findFirst({
-      where: { content: updatedFinanceText },
+    const originalItem = await testPrisma.checklistItem.findFirst({
+      where: { id: testContext.prefix("101") },
     });
-    expect(editedItem).toBeTruthy();
-    expect(editedItem?.content).toBe(updatedFinanceText);
+    
+    expect(originalItem).toBeTruthy();
+    expect(originalItem?.content).toBe(updatedFinanceText);
 
     // Test 5: Delete a checklist item
     const deleteItemResponse = authenticatedPage.waitForResponse(
