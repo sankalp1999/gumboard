@@ -346,7 +346,7 @@ export function Note({
         ...style,
       }}
     >
-      <div className="flex items-start justify-between mb-2 flex-shrink-0">
+      <div className="flex items-start justify-between mb-1 flex-shrink-0">
         <div className="flex items-center space-x-2">
           <Avatar className="h-7 w-7 border-2 border-white dark:border-zinc-800">
             <AvatarFallback className="bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-sm font-semibold">
@@ -523,7 +523,7 @@ export function Note({
                 onCreateItem={handleCreateNewItem}
                 readonly={false}
                 showDeleteButton={false}
-                className="gap-3"
+                className="-mt-1"
               />
             )}
           </DraggableRoot>
