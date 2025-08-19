@@ -161,14 +161,14 @@ test.describe("Home Page", () => {
     const originalFinanceText = testContext.prefix("Finance update by Friday");
     const updatedFinanceText = testContext.prefix("Updated Finance deadline");
     const financeItemLocator = authenticatedPage.getByTestId(testContext.prefix("101"));
-    
+
     await financeItemLocator.getByText(originalFinanceText).click();
     const editInput = financeItemLocator.locator("textarea");
     await expect(editInput).toBeVisible();
-    
+
     await editInput.clear();
     await editInput.fill(updatedFinanceText);
-    
+
     const editResponse = authenticatedPage.waitForResponse(
       (resp) =>
         resp.url().includes(`/api/boards/${demoBoard.id}/notes/`) &&
@@ -177,13 +177,13 @@ test.describe("Home Page", () => {
     );
     await editInput.press("Enter");
     await editResponse;
-    
+
     await expect(financeItemLocator.getByText(updatedFinanceText)).toBeVisible();
 
     const originalItem = await testPrisma.checklistItem.findFirst({
       where: { id: testContext.prefix("101") },
     });
-    
+
     expect(originalItem).toBeTruthy();
     expect(originalItem?.content).toBe(updatedFinanceText);
 
