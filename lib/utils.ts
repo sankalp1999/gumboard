@@ -23,21 +23,21 @@ export function getBaseUrl(requestOrHeaders?: Request | Headers): string {
 
 export function getResponsiveConfig() {
   if (typeof window === "undefined") {
-    return { noteWidth: 320, gridGap: 20, containerPadding: 20, notePadding: 16 };
+    return { noteWidth: 320, gridGap: 20, containerPadding: 20, notePadding: 12 };
   }
 
   const width = window.innerWidth;
 
   if (width >= 1920) {
-    return { noteWidth: 340, gridGap: 24, containerPadding: 32, notePadding: 18 };
+    return { noteWidth: 340, gridGap: 24, containerPadding: 32, notePadding: 14 };
   } else if (width >= 1200) {
-    return { noteWidth: 320, gridGap: 20, containerPadding: 24, notePadding: 16 };
+    return { noteWidth: 320, gridGap: 20, containerPadding: 24, notePadding: 12 };
   } else if (width >= 768) {
-    return { noteWidth: 300, gridGap: 16, containerPadding: 20, notePadding: 16 };
+    return { noteWidth: 300, gridGap: 16, containerPadding: 20, notePadding: 12 };
   } else if (width >= 600) {
-    return { noteWidth: 280, gridGap: 16, containerPadding: 16, notePadding: 14 };
+    return { noteWidth: 280, gridGap: 16, containerPadding: 16, notePadding: 10 };
   } else {
-    return { noteWidth: 260, gridGap: 12, containerPadding: 12, notePadding: 12 };
+    return { noteWidth: 260, gridGap: 12, containerPadding: 12, notePadding: 10 };
   }
 }
 
