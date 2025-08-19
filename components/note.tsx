@@ -523,7 +523,7 @@ export function Note({
                 onCreateItem={handleCreateNewItem}
                 readonly={false}
                 showDeleteButton={false}
-                className=""
+                className="gap-1"
               />
             )}
           </DraggableRoot>
