@@ -468,7 +468,7 @@ export function Note({
       </div>
 
       <div className="flex flex-col">
-        <div className="overflow-y-auto space-y-1">
+        <div className="overflow-y-auto space-y-0.5">
           {/* Checklist Items */}
           <DraggableRoot
             items={note.checklistItems ?? []}
@@ -478,7 +478,7 @@ export function Note({
               }
             }}
           >
-            <DraggableContainer className="space-y-1">
+            <DraggableContainer className="space-y-0.5">
               {note.checklistItems?.map((item) => (
                 <DraggableItem key={item.id} id={item.id} disabled={!canEdit}>
                   <ChecklistItemComponent
